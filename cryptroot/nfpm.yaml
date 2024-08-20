@@ -1,0 +1,34 @@
+# nfpm example configuration file
+#
+# check https://nfpm.goreleaser.com/configuration for detailed usage
+#
+name: "cryptroot-package"
+arch: "arm64"
+platform: "linux"
+version: "1.0.0"
+section: "default"
+priority: "extra"
+
+maintainer: "Ben Benson <ben.benson@raspberrypi.com"
+
+depends:
+  - cryptsetup-bin
+  - libgcc-s1
+  - openssl
+
+contents:
+- src: ./init_cryptroot.sh
+  dst: /usr/local/bin/init_cryptroot.sh
+- src: cryptroot.service
+  dst: /etc/systemd/system/cryptroot.service
+- src: /etc/systemd/system/cryptroot.service
+  dst: /etc/systemd/system/multi-user.target.wants/cryptroot.service
+  type: symlink
+- src: cryptkey-fetch
+  dst: /bin/cryptkey-fetch
+- src: vcgencmd
+  dst: /bin/vcgencmd
+- src: vcmailbox
+  dst: /bin/vcmailbox
+- src: rpi-otp-private-key
+  dst: /usr/local/bin/rpi-otp-private-key

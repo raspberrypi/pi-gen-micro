@@ -1,0 +1,54 @@
+== Building an Image
+
+This will talk you through building the mass-storage-gadget image that is commonly used to flash an image onto a CM4.
+
+=== Step 1 - Configuration
+
+To create a new configuration for `pi-gen-micro`  to use, run the app by running the command:
+----
+$ python3 configure.py
+----
+You will be greeted by a screen, that should contain an empty table, and a button to `make new configuration`. Click on the button, and a dialog should appear. In the text entry box, enter the configuration name. For this example, we will be using the name `mass-storage-gadget`. Click save to save the name and enter the configuration page.
+
+The configuration screen will initialise with two tables visible. The table on the left shows the components that you are adding to the image, the table on the right shows the build parameters that `pi-gen-micro` will use.
+
+`mass-storage-gadget` is created by installing a debian package into the build. The debian package has been prebuilt for you, and can be found in the `packages/` folder. To direct `pi-gen-micro`  to consume this package into the build, we will click on the `add .deb files` button. 
+
+A dialog will then appear, with a text entry box. In this enter the path of the debian package. The path root defaults to being from wherever `pi-gen-micro`  is installed (e.g. `/home/pi/pi-gen-micro/`), but you can also use out of tree packages by specifying an absolute path (e.g `/home/pi/Downloads/package.deb`).
+
+Here we want to enter `packages/mass-storage-gadget_1.0.0_arm64.deb`. To add the package to be staged, click `add`. You should now observe that in the `Additional Components` table, that a new entry has appeared: `"DEBIAN: packages/mass-storage-gadget_1.0.0_arm64.deb"`. This indicates that `pi-gen-micro`  will take the debian package and install that into the build image.
+
+This is the first step done, click the `save` button to save the staged changes.
+
+=== Step 2 - Confirming Build Parameters
+
+The table on the right contains a number of build parameters. The first one we want to edit will be the `OUT_IMAGE_NAME` parameter. To help us find the image when it is built, we will change this parameter to `mass-storage-gadget.img`. To do so, click either on the current entry, or on the parameter name. A dialog to edit the parameter value should appear. In this box, we want to enter `mass-storage-gadget.img`. Once this is entered, click `save` to return to the main screen and stage that change.
+
+For this example, we will leave the rest of the parameters as default.
+
+=== Step 3 - Adding Prebuilt Components
+
+`pi-gen-micro` contains a few prebuilt components that you can easily install into your image. To view them, click on the `Add or Remove Components` button that can be seen at the bottom of the page. This should take you to a new screen with a list of the prebuilt components that are availible for use.
+
+For the `mass-storage-gadget`, we will want to enable `ssh` to check that everything is working as expected. On this screen, click on the `SSH` option. A green cross should appear to the left of the text, which indicates that the component will be added.
+
+Click on Save Components List to stage the list, and return back to the main screen. You should observe that the `Additional Components` now contains a new line `INCLUDE-COMPONENT: SSH`. This indicates that SSH will be installed and setup into the image.
+
+You will also need to insert your public SSH key into `prebuilts/authorized_keys`, which `pi-gen-micro` will copy into the image.
+
+=== Step 4 - Saving the configuration
+
+This is all the preparation we need to make the `mass-storage-gadget`, so to save the changes we have made, click the `save` button. This will return you to the terminal.
+
+*No changes are saved until you press the `save` button.*
+
+=== Step 5 - Building!
+
+To direct `pi-gen-micro`  to use the build configuration we have just created, in the terminal, type: 
+----
+$ sudo ./build.sh mass-storage-gadget
+----
+The terminal should start spewing out all sorts of information about the build process. Depending on what you're running on (e.g. sd card, or nvme drive), this can take a few minutes.
+
+Once this process is completed, you should have an image, `mass-storage-gadget.img`, which you can then use rpiboot to boot onto a raspberry pi, and watch it appear as a block device!
+

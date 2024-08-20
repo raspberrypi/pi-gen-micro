@@ -1,0 +1,79 @@
+#!/bin/sh
+
+# teardown() {
+#    umount "${CONFIGFS}" > /dev/null 2>&1
+#    rmmod libcomposite > /dev/null 2>&1
+#    rmdir "${CONFIGFS}"
+# }
+
+# CONFIGFS=/tmp/configfs
+# if [ -d "${CONFIGFS}" ]; then
+#    teardown || true
+# fi
+
+# # Disable activity LED, otherwise eMMC will be disabled on CM3
+# if [ -e /sys/class/leds/led0 ]; then
+# 	echo none > /sys/class/leds/led0/trigger
+# 	echo 0 > /sys/class/leds/led0/brightness
+# fi
+
+# if lspci | grep -iq "USB Controller"; then
+#    # For slow to init drives it might be better to use udev events
+#    # However, that's unecessary complexity for a rare use-case
+#    # right now.
+#    echo "Detected USB Controller - delaying for drive init"
+#    sleep 5
+# fi
+
+# mkdir -p "${CONFIGFS}"
+# modprobe libcomposite
+# mount none "${CONFIGFS}" -t configfs
+# cd "${CONFIGFS}/usb_gadget"
+
+mkdir -p rpimsg
+cd rpimsg
+echo 0x0a5c > idVendor  # Broadcom
+echo 0x0104 > idProduct # Multifunction Composite Gadget
+echo 0x0100 > bcdDevice # v1.0.0
+echo 0x0200 > bcdUSB    # USB2
+mkdir -p strings/0x409
+grep Serial /proc/cpuinfo | awk '{print $3}'    > strings/0x409/serialnumber
+echo "Raspberry Pi"                             > strings/0x409/manufacturer
+echo "Raspberry Pi multi-function USB device"   > strings/0x409/product
+mkdir -p configs/c.1/strings/0x409
+echo "Config 1: ECM network" > configs/c.1/strings/0x409/configuration
+echo 250 > configs/c.1/MaxPower
+id=0
+mkdir -p functions/acm.usb0
+ln -s functions/acm.usb0 configs/c.1/
+
+for dev in mmcblk0 nvme0n1 sda sdb sdc sdd; do
+   if [ -e /dev/${dev} ]; then
+      echo "Creating mass storage gadget for /dev/${dev}" > /dev/tty0
+      mkdir -p functions/mass_storage.usb${id}
+      echo 1 > functions/mass_storage.usb${id}/stall
+      echo 0 > functions/mass_storage.usb${id}/lun.0/cdrom
+      echo 0 > functions/mass_storage.usb${id}/lun.0/ro
+      echo 0 > functions/mass_storage.usb${id}/lun.0/nofua
+      echo /dev/${dev} > functions/mass_storage.usb${id}/lun.0/file
+      echo "${dev}" > functions/mass_storage.usb${id}/lun.0/inquiry_string
+      ln -s functions/mass_storage.usb${id} configs/c.1/
+      id=$((id + 1))
+   fi
+done
+
+count=0
+while [ ${count} -lt 15 ]; do
+   udc="$(ls /sys/class/udc)"
+   if [ -n "${udc}" ]; then
+      echo "Found UDC ${udc}"
+      echo "${udc}" > UDC
+      break
+   fi
+   count=$((count + 1))
+   sleep 1
+done
+
+systemctl restart getty@ttyGS0
+
+echo "Mass storage gadget init complete - $(cat UDC)"

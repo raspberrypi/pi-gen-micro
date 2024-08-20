@@ -1,0 +1,8 @@
+path-exclude=/lib/modules/6.6.20+rpt-rpi-v8/kernel/sound/*
+path-exclude=/lib/modules/6.6.20+rpt-rpi-v8/kernel/drivers/accessibility/*
+path-exclude=/lib/modules/6.6.20+rpt-rpi-v8/kernel/drivers/accessibility/*
+path-exclude=/lib/modules/6.6.20+rpt-rpi-v8/kernel/drivers/hid/*
+path-exclude=/lib/modules/6.6.20+rpt-rpi-v8/kernel/drivers/iio/*
+path-exclude=/lib/modules/6.6.20+rpt-rpi-v8/kernel/drivers/i2c/*
+path-exclude=/lib/modules/6.6.20+rpt-rpi-v8/kernel/drivers/input/*
+path-exclude=/lib/modules/6.6.20+rpt-rpi-v8/kernel/drivers/media/*

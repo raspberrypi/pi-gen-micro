@@ -1,0 +1,1 @@
+rootwait console=tty1 console=serial0,115200 root=/dev/ram0 loglevel=8

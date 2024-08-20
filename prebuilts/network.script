@@ -1,0 +1,3 @@
+#!/bin/sh
+ifconfig $interface $ip
+echo "Set IP $ip on interface $interface"

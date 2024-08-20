@@ -1,0 +1,25 @@
+# nfpm example configuration file
+#
+# check https://nfpm.goreleaser.com/configuration for detailed usage
+#
+name: "mass-storage-gadget"
+arch: "arm64"
+platform: "linux"
+version: "1.0.0"
+section: "default"
+priority: "extra"
+maintainer: Tom Dewey <tom.dewey@raspberrypi.com>
+
+contents:
+- src: ./configure-gadgets
+  dst: /usr/local/bin/configure-gadgets
+- src: ./systemd-mass-storage-gadget.service
+  dst: /etc/systemd/system/systemd-mass-storage-gadget.service
+- src: /etc/systemd/system/systemd-mass-storage-gadget.service
+  dst: /etc/systemd/system/multi-user.target.wants/systemd-mass-storage-gadget.service
+  type: symlink
+- src: ./mass-storage-gadget.conf
+  dst: /etc/modules-load.d/mass-storage-gadget.conf
+
+deb:
+  compression: zstd

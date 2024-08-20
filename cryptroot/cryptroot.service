@@ -1,0 +1,11 @@
+[Unit]
+Description=Cryptroot init
+After=fastbootd.service
+
+[Service]
+ExecStart=/usr/local/bin/init_cryptroot.sh
+StandardOutput=file:/cryptroot_stdout.log
+StandardError=file:/cryptroot_stderr.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Pi-Gen-Micro Modules Load
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/load_modules
+Restart=never
+
+[Install]
+WantedBy=multi-user.target

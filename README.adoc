@@ -1,0 +1,84 @@
+= Pi-gen Micro
+Richard Oliver <richard.oliver@raspberrypi.com>
+
+== Future Directions
+=== Automatic udeb generation
+Investigate Debian tooling to automatically turn packages into udebs.  udebs
+are heavily cut-down (even omitting uninstall scripts) and may be ideal for
+systems that are upgraded at the block device level.
+
+=== Upgrade d-i media in-place
+The d-i environment has a udeb version of dpkg, udpkg (which is only 31 kB
+installed).  Investigate possibility of an in-place upgrade from a udeb-based
+system to something debootstrap would generate.  This could be a 'stage 0.5' of
+pi-gen.
+
+Whilst udebs are not designed to be removed/upgraded/replaced, their
+install paths *should* not conflict with those of regular .deb files as
+multiarch is not supported.
+
+The existing d-i has an hd-media option; this should be investigated as a
+starting point.
+== cryptroot image
+Kernel modules must be copied into the image:
+[source]
+----
+BUILD_DIR=$(realpath build)/
+pushd <rootfs>
+sudo find usr/lib/modules \( -name 'dm-mod.*' -o -name 'dm-crypt.*' -o -name 'af_alg.*' -o -name 'algif_skcipher.*' -o -name 'libaes.*' -o -name 'aes_generic.*' -o -name 'aes-arm64.*' \) -exec cp -r --parents "{}" ${BUILD_DIR} \;
+popd
+----
+== Future Directions
+=== Automatic udeb generation
+Investigate Debian tooling to automatically turn packages into udebs.  udebs
+are heavily cut-down (even omitting uninstall scripts) and may be ideal for
+systems that are upgraded at the block device level.
+
+=== Upgrade d-i media in-place
+The d-i environment has a udeb version of dpkg, udpkg (which is only 31 kB
+installed).  Investigate possibility of an in-place upgrade from a udeb-based
+system to something debootstrap would generate.  This could be a 'stage 0.5' of
+pi-gen.
+
+Whilst udebs are not designed to be removed/upgraded/replaced, their
+install paths *should* not conflict with those of regular .deb files as
+multiarch is not supported.
+
+The existing d-i has an hd-media option; this should be investigated as a
+starting point.
+== cryptroot image
+Kernel modules must be copied into the image:
+[source]
+----
+BUILD_DIR=$(realpath build)/
+pushd <rootfs>
+sudo find usr/lib/modules \( -name 'dm-mod.*' -o -name 'dm-crypt.*' -o -name 'af_alg.*' -o -name 'algif_skcipher.*' -o -name 'libaes.*' -o -name 'aes_generic.*' -o -name 'aes-arm64.*' \) -exec cp -r --parents "{}" ${BUILD_DIR} \;
+popd
+----
+
+== TODO
+
+* Spurious errors from apt
+* dpkg potentially leaking to host system (logs, etc)
+* libc6-udeb (minimal installer version of libc6) is in use.  The consequences of this have not been fully explored.  Only a https://salsa.debian.org/glibc-team/glibc/-/blob/bookworm/debian/debhelper.in/libc-udeb.install?ref_type=heads[*subset of shared libraries*] are installed with this package.
+* update-alternatives: Should be possible to use the host version in a 'cross' manner (DPKG_ROOT et al. are respected)
+* Consider https://wiki.ubuntu.com/ReducingDiskFootprint#Drop_unnecessary_files[*dpkg-hooks*] to reduce package size; these could also remove initramfs hooks/scripts.
+* Consider using busybox-udeb in pi-gen-micro
+* Investigate apt-install utility in debian-installer-utils as an alternative to 'tricking' apt/dpkg
+* Investigate using udpkg/anna instead of dpkg/apt
+* Consider using rootskel rather than base-files and cryptsetup-udeb instead of cryptsetup.
+* Automatic udeb downloader... or make use of tooling from d-i.
+
+== Dependencies
+
+pi-gen-micro is expected to run on any recent raspberry pi. To use the app you must have `textual` and `textual[syntax]`
+----
+$ pip install textual
+$ pip install "textual[syntax]"
+----
+
+Then need to run
+----
+./init.sh
+----
+which will set up the configurations directory

@@ -1,0 +1,15 @@
+[Unit]
+Description=Mass storage gadget
+Requires=sys-kernel-config.mount
+After=sys-kernel-config.mount
+Requires=systemd-modules-load.service
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/sys/kernel/config/usb_gadget
+ExecStart=/usr/local/bin/configure-gadgets
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target
