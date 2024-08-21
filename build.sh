@@ -179,34 +179,73 @@ popd
 
 apt_install kmod
 
+if [ ${UDEV} = 1 ]
+then
+  echo "Installing UDEV!"
+  # libc-bin required for passwd postinst
+  apt_install libc-bin
+
+  # Setup passwd (udev dep)
+  cp build/bin/update-alternatives build/bin/dpkg-maintscript-helper
+  apt_install passwd
+  rm build/bin/dpkg-maintscript-helper
+
+  # Install perl-base, addgroup dep (used by udev postinst)
+  apt_install perl-base
+
+  # Setup udev
+  dpkg_unpack udev
+  rm -rf build/etc/init.d
+  apt-get --fix-broken install
+fi
+
+if [ ${NETWORK} = 1 ]
+then
+  if [ ${UDEV} = 1 ]
+  then
+    echo "Installing & Enabling networking"
+    cp prebuilts/20-wired.network build/etc/systemd/network/20-wired.network
+    ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/dbus-org.freedesktop.network1.service
+    ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
+    ln -s /lib/systemd/system/systemd-networkd.socket build/systemd/system/sockets.target.wants/systemd-networkd.socket
+    ln -s /lib/systemd/system/systemd-network-generator.service build/etc/systemd/system/sysinit.target.wants/systemd-network-generator.service
+    ln -s /lib/systemd/system/systemd-networkd-wait-online.service build/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service
+  else
+    echo "--------------- ERROR - Network cannot be installed without UDEV Support. This component will not work! --------------------"
+  fi
+fi
+
+
 # Symlink to regular /sbin/init
 # ln -s /sbin/init build/init
 
-# Ensure getty on tty1 is autologin
-mkdir -p build/etc/systemd/system/getty@tty1.service.d
-echo "[Service]
-ExecStart=
-ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin root %I \$TERM
-TTYVTDisallocate=no
-" > build/etc/systemd/system/getty@tty1.service.d/autologin.conf
+if [ ${AUTOLOGIN} = 1 ]
+then
+  # Ensure getty on tty1 is autologin
+  mkdir -p build/etc/systemd/system/getty@tty1.service.d
+  echo "[Service]
+  ExecStart=
+  ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin root %I \$TERM
+  TTYVTDisallocate=no
+  " > build/etc/systemd/system/getty@tty1.service.d/autologin.conf
 
-# getty-static.service starts tty2-tty6 if dbus / logind are not available
-# Override this behaviour
-mkdir -p build/etc/systemd/system/getty-static.service.d
-echo "[Service]
-ExecStart=
-ExecStart=/bin/true
-" > build/etc/systemd/system/getty-static.service.d/override.conf
+  # getty-static.service starts tty2-tty6 if dbus / logind are not available
+  # Override this behaviour
+  mkdir -p build/etc/systemd/system/getty-static.service.d
+  echo "[Service]
+  ExecStart=
+  ExecStart=/bin/true
+  " > build/etc/systemd/system/getty-static.service.d/override.conf
 
-# serial-getty shouldn't wait for device unit (no udev) and should autologin as
-# root
-sed '
-/^BindsTo/d
-/^After=/s/dev-%i\.device\s*//
-s/\(--keep-baud\)/--noclear --autologin root \1/' \
-	build/usr/lib/systemd/system/serial-getty@.service \
-	> build/etc/systemd/system/serial-getty@.service
-
+  # serial-getty shouldn't wait for device unit (no udev) and should autologin as
+  # root
+  sed '
+  /^BindsTo/d
+  /^After=/s/dev-%i\.device\s*//
+  s/\(--keep-baud\)/--noclear --autologin root \1/' \
+    build/usr/lib/systemd/system/serial-getty@.service \
+    > build/etc/systemd/system/serial-getty@.service
+fi
 # Ensure compressed modules can be loaded (busybox implementation of modprobe
 # is insufficient)
 dpkg_unpack kmod
