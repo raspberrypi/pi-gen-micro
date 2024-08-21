@@ -1,0 +1,11 @@
+[Unit]
+Description=Fastbootd
+After=systemd-networkd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/run_fastboot_tcp
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
