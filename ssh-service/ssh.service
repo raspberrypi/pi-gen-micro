@@ -1,0 +1,13 @@
+[Unit]
+Description=Set up an SSH shell
+After=network.target
+ConditionPathExists=!/etc/ssh_not_to_be_run
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/ssh_service
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

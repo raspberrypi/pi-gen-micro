@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Configure dropbear
+ln -s /usr/sbin/dropbearmulti /usr/bin/scp
+mkdir -p /etc/dropbear
+# Create ssh keys
+/usr/bin/dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key
+/usr/bin/dropbearkey -t dss -f /etc/dropbear/dropbear_dss_host_key
+
+# Start the ssh service
+/usr/sbin/dropbear -F

@@ -1,0 +1,23 @@
+# nfpm example configuration file
+#
+# check https://nfpm.goreleaser.com/configuration for detailed usage
+#
+name: "dropbear-ssh-service"
+arch: "arm64"
+platform: "linux"
+version: "1.0.0"
+section: "default"
+priority: "extra"
+maintainer: Tom Dewey <tom.dewey@raspberrypi.com>
+
+contents:
+- src: ./ssh_service
+  dst: /usr/local/bin/ssh_service
+- src: ./ssh.service
+  dst: /etc/systemd/system/ssh.service
+- src: /etc/systemd/system/ssh.service
+  dst: /etc/systemd/system/multi-user.target.wants/ssh.service
+  type: symlink
+
+deb:
+  compression: zstd

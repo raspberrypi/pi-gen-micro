@@ -151,6 +151,7 @@ if [ ${SSH} = 1 ]
 then
   echo "Installing SSH!"
   apt_install dropbear-bin
+  apt_install ./packages/dropbear-ssh-service_1.0.0_arm64.deb
 fi
 
 # TODO: postinst failure, fstrim settings using deb-systemd-helper
