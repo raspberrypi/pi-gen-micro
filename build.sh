@@ -320,32 +320,6 @@ cp prebuilts/vcgencmd build/bin/
 mkdir build/usr/local/bin
 cp prebuilts/rpi-otp-private-key build/usr/local/bin
 
-mkdir build/usr/share/udhcpc/
-cp prebuilts/network.script build/usr/share/udhcpc/network.script
-
-
-
-
-# Copy staged modules
-# pushd /mnt/src/debian/systemd-252.26/
-# sudo ./build_and_copy.sh
-# popd
-
-# cp -r staged_build/* build
-
-# Copy modules.dep
-# cp -r prebuilts/lib/. build/lib/
-# cp -r prebuilts/usr build/
-# cp -r prebuilts/etc/* build/etc/
-
-# rm build/usr/lib/systemd/system/systemd-firstboot.service
-# rm build/usr/lib/systemd/system/sysinit.target.wants/systemd-firstboot.service
-# cp prebuilts/getty@.service build/usr/lib/systemd/system/getty@.service
-# cp prebuilts/serial-getty@.service build/usr/lib/systemd/system/serial-getty@.service
-# cp prebuilts/serial-getty@.service build/etc/systemd/system/serial-getty@.service
-cp prebuilts/vcmailbox build/sbin/vcmailbox
-cp prebuilts/vcgenmd build/sbin/vcgenmd
-
 ## Fix up systemd-modules-load
 cp prebuilts/load_modules.sh build/usr/local/bin/load_modules
 cp prebuilts/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
