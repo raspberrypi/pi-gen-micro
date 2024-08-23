@@ -1,0 +1,11 @@
+# Documentation
+path-exclude=/usr/share/doc/*
+path-include=*/share/doc/*/copyright
+path-exclude=/usr/share/man/*
+path-exclude=/usr/share/groff/*
+path-exclude=/usr/share/info/*
+# Lintian
+path-exclude=/usr/share/lintian/*
+path-exclude=/usr/share/linda/*
+# Locales / Translations
+path-exclude=/usr/share/locale/*

@@ -32,10 +32,16 @@ export ROOTFS_DIR=$PWD/build
 export DPKG_ROOT=$ROOTFS_DIR
 export TOP="${PWD}"
 
-sed "s%PWD%${PWD}%" cfg/apt.cfg > apt.cfg
-sed --in-place "s%REALROOTREL%$(realpath -s --relative-to=$PWD /)/%" apt.cfg
+# Relies on GNU sed extension (/dev/stdin file for 'r' command)
+sed '/^#/d;s/^/    "--/;s/$/";/' cfg/dpkg_extra_args | \
+sed "
+s%PWD%${PWD}%
+s%REALROOTREL%$(realpath -s --relative-to=$PWD /)/%
+/DPKG_EXTRA_ARGS/{r /dev/stdin
+d}" cfg/apt.cfg > apt.cfg
+
 export APT_CONFIG=$PWD/apt.cfg
-# export DPKG_EXTRA_ARGS="--instdir=${DPKG_ROOT}"
+DPKG_EXTRA_ARGS="$(sed '/^#/d;s/^/--/' "${CONFIGURATION_FOLDER}"/dpkg_extra_args | xargs)"
 
 KERNEL_VERSION_STR="6.6.31+rpt-rpi-v8"
 
@@ -56,12 +62,16 @@ get_package_path() {
 
 dpkg_unpack() {
   apt_download $1
+  set -o noglob
   dpkg ${DPKG_EXTRA_ARGS} --no-triggers --unpack $(get_package_path $1)
+  set +o noglob
 }
 
 dpkg_install() {
   apt_download $1
+  set -o noglob
   dpkg ${DPKG_EXTRA_ARGS} --install $(get_package_path $1)
+  set +o noglob
 }
 
 apt-get update
@@ -80,7 +90,9 @@ echo "Replaces: libc6 (= ${LIBC_VERSION})
 Conflicts: libc6 (= ${LIBC_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/control"
 dpkg-deb --build "${EXTRACT_DIR}" "${PACKAGE_PATH}"
 rm -rf "${EXTRACT_DIR}"
+set -o noglob
 dpkg ${DPKG_EXTRA_ARGS} --install "${PACKAGE_PATH}"
+set +o noglob
 
 dpkg_install busybox
 
@@ -265,8 +277,50 @@ apt_download $KERNEL
 KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
 KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
 
-# TODO: This leaves apt in a broken state, see what we can do here.
-dpkg_unpack ${KERNEL_PACKAGE}
+KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
+dpkg-deb --raw-extract "$(get_package_path ${KERNEL_PACKAGE})" "${KPKG_EXTRACT}"
+
+# Copy requested kernel modules (+deps) into image and generate module dependencies
+depmod --basedir $KPKG_EXTRACT $KERNEL_VERSION_STR
+cd $KPKG_EXTRACT >/dev/null || exit
+module_paths=()
+get_deps() {
+	local module_name=$1
+
+	readarray -t file_deps <<<$(modinfo --basedir . -k $KERNEL_VERSION_STR $module_name | grep -oP '^(?:filename|depends):\s+\K.*')
+	module_paths+=(${file_deps[0]})
+
+	if [ ${#file_deps[@]} -eq "2" ]
+	then
+		readarray -t -d , deps <<<${file_deps[1]}
+		for dep in "${deps[@]}"
+		do
+			get_deps $dep
+		done
+	fi
+}
+for dep in $(sed '/^#/d' "${CONFIGURATION_FOLDER}"/kernel_modules.list | xargs)
+do
+	get_deps $dep
+done
+cd - || exit
+printf "
+${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.order
+${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.builtin
+${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.builtin.modinfo
+%s
+" "${module_paths[@]}" | sort | uniq | \
+rsync \
+	--perms \
+	--times \
+	--group \
+	--owner \
+	--acls \
+	--xattrs \
+	--files-from=- \
+	/ \
+	"${ROOTFS_DIR}/"
+depmod --basedir $ROOTFS_DIR $KERNEL_VERSION_STR
 
 # Manually form-up the kernel and bootfs
 mkdir -p ${OUT_DIR}/overlays
