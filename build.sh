@@ -11,28 +11,20 @@ source config
 CONFIGURATION_FOLDER="${CONFIGURATION_ROOT}"$1
 
 export OUT_DIR=$PWD/out_image
-source ${CONFIGURATION_FOLDER}/build.parameters
-source ${CONFIGURATION_FOLDER}/components.parameters
+source "${CONFIGURATION_FOLDER}"/build.parameters
+source "${CONFIGURATION_FOLDER}"/components.parameters
 
-echo ${CONFIGURATION_FOLDER}
-echo ${TARGET_DEVICE}
+echo "${CONFIGURATION_FOLDER}"
+echo "${TARGET_DEVICE}"
 
-rm -rf build
-rm initramfs
-rm -rf $OUT_DIR
-mkdir -p build
-mkdir $OUT_DIR
-
-export OUT_DIR=$PWD/out_image
 rm -rf build
 rm -f initramfs
-rm -rf $OUT_DIR
-mkdir -p build
-mkdir $OUT_DIR
+rm -rf "${OUT_DIR}"
+mkdir "${OUT_DIR}"
 
 mkdir -p build/usr/bin
 mkdir -p build/usr/lib
-cd build
+cd build || exit
 ln -s usr/bin bin
 ln -s usr/lib lib
 cd ..
@@ -92,15 +84,14 @@ dpkg ${DPKG_EXTRA_ARGS} --install "${PACKAGE_PATH}"
 
 dpkg_install busybox
 
-pushd build
-cd bin
+cd build/bin || exit
 ln -s busybox sh
 ln -s mawk awk
 echo '#!/bin/sh' > update-alternatives
 echo 'return 0' >> update-alternatives
 chmod +x update-alternatives
 cp update-alternatives dpkg-trigger
-popd
+cd - || exit
 
 # awk is Pre-Depends of base-files (unfortunately)
 dpkg_install mawk
@@ -174,9 +165,9 @@ do
    apt_install $package
 done
 
-pushd ${CONFIGURATION_FOLDER}
+cd "${CONFIGURATION_FOLDER}" || exit
 ./installer_scripts.list
-popd
+cd "${TOP}" || exit
 
 apt_install kmod
 
@@ -261,11 +252,11 @@ apt-get --fix-broken install
 
 apt_download raspi-firmware
 RASPI_FIRMWARE_TMPDIR=$(mktemp -d)
-cd "${RASPI_FIRMWARE_TMPDIR}"
+cd "${RASPI_FIRMWARE_TMPDIR}" || exit
 ar -x $(find ${TOP}/apt/cache/archives/ -name raspi-firmware* | sort | tail -1)
 tar xvf data.tar.xz ./
 mv ./usr/lib/raspi-firmware/* ${DPKG_ROOT}/boot/
-cd -
+cd - || exit
 rm -rf "${RASPI_FIRMWARE_TMPDIR}"
 
 # Find kernel
@@ -312,7 +303,7 @@ cp -r packages/built/bin/* build/usr/bin/
 # Copy init
 cp prebuilts/init build/init
 # ln build/usr/sbin /sbin
-cd build/sbin
+cd build/sbin || exit
 rm init
 
 ln -s /usr/lib/systemd/systemd init
@@ -382,7 +373,7 @@ systemd-timesync:x:107:
 kvm:*:1023" >> build/etc/group
 
 # Package initramfs
-cd build
+cd build || exit
 find . -print0 | cpio --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
 cd ..
 zstd --no-progress --rm -15 initramfs.cpio -o ${OUT_DIR}/rootfs.cpio.zst
