@@ -28,8 +28,8 @@ exit 1
 
 
 read_key() {
-    out=READ_KEY="$(vcmailbox 0x00030081 $((8 + $ROW_COUNT * 4)) $((8 + $ROW_COUNT * 4)) $ROW_OFFSET $ROW_COUNT 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)" || die "Failed to read the current key from OTP"
-    READ_KEY="$(echo "${out}" | sed 's/0x//g' | awk -v last=$((8 + $ROW_COUNT)) '{for(i=8;i<last;i++) printf $i; print ""}')"
+    out=READ_KEY="$(vcmailbox 0x00030081 $((8 + ROW_COUNT * 4)) $((8 + ROW_COUNT * 4)) "$ROW_OFFSET" "$ROW_COUNT" 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)" || die "Failed to read the current key from OTP"
+    READ_KEY="$(echo "${out}" | sed 's/0x//g' | awk -v last=$((8 + ROW_COUNT)) '{for(i=8;i<last;i++) printf $i; print ""}')"
 }
 
 if [ -f "/sys/firmware/devicetree/base/system/linux,revision" ]; then
@@ -71,10 +71,10 @@ fi
 if [ $ROW_OFFSET -lt 0 ]; then
     die "Offset too small"
 fi
-if [ ${ROW_OFFSET} -gt $(($MAX_ROW_COUNT - $ROW_COUNT)) ]; then
+if [ ${ROW_OFFSET} -gt $((MAX_ROW_COUNT - ROW_COUNT)) ]; then
     die "Offset too big"
 fi
-if [ -z $(which vcmailbox) ]; then
+if [ -z "$(which vcmailbox)" ]; then
     die "vcmailbox command missing"
 fi
 
