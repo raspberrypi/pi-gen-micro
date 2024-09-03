@@ -9,7 +9,7 @@ version: "1.0.0"
 section: "default"
 priority: "extra"
 
-maintainer: "Ben Benson <ben.benson@raspberrypi.com"
+maintainer: "Richard Oliver <richard.oliver@raspberrypi.com>"
 
 depends:
   - cryptsetup-bin
