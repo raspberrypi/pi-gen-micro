@@ -8,7 +8,7 @@ platform: "linux"
 version: "1.0.0"
 section: "default"
 priority: "extra"
-maintainer: Tom Dewey <tom.dewey@raspberrypi.com>
+maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
 
 contents:
 - src: ./configure-gadgets
