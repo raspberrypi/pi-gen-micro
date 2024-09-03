@@ -36,41 +36,41 @@ export TOP="${PWD}"
 sed '/^#/d;s/^/    "--/;s/$/";/' cfg/dpkg_extra_args | \
 sed "
 s%PWD%${PWD}%
-s%REALROOTREL%$(realpath -s --relative-to=$PWD /)/%
+s%REALROOTREL%$(realpath -s --relative-to="$PWD" /)/%
 /DPKG_EXTRA_ARGS/{r /dev/stdin
 d}" cfg/apt.cfg > apt.cfg
 
 export APT_CONFIG=$PWD/apt.cfg
 DPKG_EXTRA_ARGS="$(sed '/^#/d;s/^/--/' "${CONFIGURATION_FOLDER}"/dpkg_extra_args | xargs)"
 
-KERNEL_VERSION_STR="6.6.31+rpt-rpi-v8"
-
 apt_download() {
-  apt-get install --download-only $@
+  apt-get install --download-only "$@"
 }
 
 # Can't use install until it's possible to chroot
 apt_install() {
-  apt-get install $@ --no-install-recommends
+  apt-get install "$@" --no-install-recommends
 }
 
 get_package_path() {
   # Not fully URL-encoded (no spec found)
   PKG_VERSION=$(apt-cache policy "$1" | grep -oP 'Candidate: \K.*' | sed 's/:/%3a/')
-  echo "$(find apt/cache/archives/ -name ${1}_${PKG_VERSION}*)"
+  find apt/cache/archives/ -name "${1}_${PKG_VERSION}*"
 }
 
 dpkg_unpack() {
-  apt_download $1
+  apt_download "$1"
   set -o noglob
-  dpkg ${DPKG_EXTRA_ARGS} --no-triggers --unpack $(get_package_path $1)
+  # shellcheck disable=SC2086
+  dpkg ${DPKG_EXTRA_ARGS} --no-triggers --unpack "$(get_package_path $1)"
   set +o noglob
 }
 
 dpkg_install() {
-  apt_download $1
+  apt_download "$1"
   set -o noglob
-  dpkg ${DPKG_EXTRA_ARGS} --install $(get_package_path $1)
+  # shellcheck disable=SC2086
+  dpkg ${DPKG_EXTRA_ARGS} --install "$(get_package_path $1)"
   set +o noglob
 }
 
@@ -84,13 +84,14 @@ PACKAGE_PATH="$(get_package_path libc6-udeb)"
 EXTRACT_DIR="$(mktemp --directory --tmpdir deb-extract.XXX)"
 dpkg-deb --raw-extract "${PACKAGE_PATH}" "${EXTRACT_DIR}"
 rm "${PACKAGE_PATH}"
-LIBC_VERSION="$(grep -oP '^Version:\s*\K.*' ${EXTRACT_DIR}/DEBIAN/control)"
+LIBC_VERSION="$(grep -oP '^Version:\s*\K.*' "${EXTRACT_DIR}"/DEBIAN/control)"
 sed --in-place "/^Provides:/s/libc6,/libc6 (= ${LIBC_VERSION}),/" "${EXTRACT_DIR}/DEBIAN/control"
 echo "Replaces: libc6 (= ${LIBC_VERSION})
 Conflicts: libc6 (= ${LIBC_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/control"
 dpkg-deb --build "${EXTRACT_DIR}" "${PACKAGE_PATH}"
 rm -rf "${EXTRACT_DIR}"
 set -o noglob
+# shellcheck disable=SC2086
 dpkg ${DPKG_EXTRA_ARGS} --install "${PACKAGE_PATH}"
 set +o noglob
 
@@ -150,7 +151,7 @@ apt_install openssl
 # Tiny debconf for libpam0g (systemd dep)
 apt_install cdebconf-udeb cdebconf-text-udeb
 sed --in-place 's/newt/text/g' build/etc/cdebconf.conf
-if [ ${SSH} = 1 ]
+if [ "${SSH}" = 1 ]
 then
   echo "Installing SSH!"
   apt_install dropbear-bin
@@ -167,14 +168,12 @@ apt_install systemd-sysv
 rm build/bin/dpkg-maintscript-helper
 rm build/bin/dpkg
 
-IFS=', ' read -r -a array <<< "$(cat ${CONFIGURATION_FOLDER}/packages.list | tr '\n' ', ')"
-echo ${array}
+IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\n' ', ')"
 
 for package in "${array[@]}"
 do
-   echo "Installing $package"
-   #dpkg ${DPKG_EXTRA_ARGS} --install $package
-   apt_install $package
+   echo "Installing ${package}"
+   apt_install "${package}"
 done
 
 cd "${CONFIGURATION_FOLDER}" || exit
@@ -183,7 +182,7 @@ cd "${TOP}" || exit
 
 apt_install kmod
 
-if [ ${UDEV} = 1 ]
+if [ "${UDEV}" = 1 ]
 then
   echo "Installing UDEV!"
   # libc-bin required for passwd postinst
@@ -203,9 +202,9 @@ then
   apt-get --fix-broken install
 fi
 
-if [ ${NETWORK} = 1 ]
+if [ "${NETWORK}" = 1 ]
 then
-  if [ ${UDEV} = 1 ]
+  if [ "${UDEV}" = 1 ]
   then
     echo "Installing & Enabling networking"
     cp prebuilts/20-wired.network build/etc/systemd/network/20-wired.network
@@ -223,10 +222,11 @@ fi
 # Symlink to regular /sbin/init
 # ln -s /sbin/init build/init
 
-if [ ${AUTOLOGIN} = 1 ]
+if [ "${AUTOLOGIN}" = 1 ]
 then
   # Ensure getty on tty1 is autologin
   mkdir -p build/etc/systemd/system/getty@tty1.service.d
+  # shellcheck disable=SC2028
   echo "[Service]
   ExecStart=
   ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin root %I \$TERM
@@ -265,42 +265,46 @@ apt-get --fix-broken install
 apt_download raspi-firmware
 RASPI_FIRMWARE_TMPDIR=$(mktemp -d)
 cd "${RASPI_FIRMWARE_TMPDIR}" || exit
-ar -x $(find ${TOP}/apt/cache/archives/ -name raspi-firmware* | sort | tail -1)
+ar -x "$(find "${TOP}"/apt/cache/archives/ -name 'raspi-firmware*' | sort | tail -1)"
 tar xvf data.tar.xz ./
-mv ./usr/lib/raspi-firmware/* ${DPKG_ROOT}/boot/
+mv ./usr/lib/raspi-firmware/* "${DPKG_ROOT}"/boot/
 cd - || exit
 rm -rf "${RASPI_FIRMWARE_TMPDIR}"
 
 # Find kernel
 KERNEL_META=linux-image-rpi-v8
-apt_download $KERNEL
+apt_download "${KERNEL}"
 KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
 KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
 
 KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
-dpkg-deb --raw-extract "$(get_package_path ${KERNEL_PACKAGE})" "${KPKG_EXTRACT}"
+dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
 
 # Copy requested kernel modules (+deps) into image and generate module dependencies
-depmod --basedir $KPKG_EXTRACT $KERNEL_VERSION_STR
-cd $KPKG_EXTRACT >/dev/null || exit
+depmod --basedir "${KPKG_EXTRACT}" "${KERNEL_VERSION_STR}"
+cd "${KPKG_EXTRACT}" >/dev/null || exit
 module_paths=()
 get_deps() {
 	local module_name=$1
 
-	readarray -t file_deps <<<$(modinfo --basedir . -k $KERNEL_VERSION_STR $module_name | grep -oP '^(?:filename|depends):\s+\K.*')
-	module_paths+=(${file_deps[0]})
+	# shellcheck disable=SC2046
+	readarray -t file_deps <<<$(modinfo --basedir . -k "${KERNEL_VERSION_STR}" "${module_name}" | grep -oP '^(?:filename|depends):\s+\K.*')
+	module_paths+=("${file_deps[0]}")
 
 	if [ ${#file_deps[@]} -eq "2" ]
 	then
+		# shellcheck disable=SC2086
 		readarray -t -d , deps <<<${file_deps[1]}
 		for dep in "${deps[@]}"
 		do
+			# shellcheck disable=SC2086
 			get_deps $dep
 		done
 	fi
 }
 for dep in $(sed '/^#/d' "${CONFIGURATION_FOLDER}"/kernel_modules.list | xargs)
 do
+	# shellcheck disable=SC2086
 	get_deps $dep
 done
 cd - || exit
@@ -320,26 +324,26 @@ rsync \
 	--files-from=- \
 	/ \
 	"${ROOTFS_DIR}/"
-depmod --basedir $ROOTFS_DIR $KERNEL_VERSION_STR
+depmod --basedir "${ROOTFS_DIR}" "${KERNEL_VERSION_STR}"
 
 # Manually form-up the kernel and bootfs
-mkdir -p ${OUT_DIR}/overlays
+mkdir -p "${OUT_DIR}"/overlays
 # mv ${DPKG_ROOT}/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/zImage
-mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/broadcom/*.dtb ${OUT_DIR}/
-mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/overlays/*.dtb* ${OUT_DIR}/overlays/
-mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/overlays/README ${OUT_DIR}/overlays/
-mv ${DPKG_ROOT}/boot/* ${OUT_DIR}/
+mv "${DPKG_ROOT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/*.dtb "${OUT_DIR}"/
+mv "${DPKG_ROOT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
+mv "${DPKG_ROOT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
+mv "${DPKG_ROOT}"/boot/* "${OUT_DIR}"/
 
 mkdir build/data/
-cp prebuilts/config.txt ${OUT_DIR}/config.txt
-cp prebuilts/cmdline.txt ${OUT_DIR}/cmdline.txt
+cp prebuilts/config.txt "${OUT_DIR}"/config.txt
+cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 # apt_install debconf
 
-dpkg_unpack linux-image-${KERNEL_VERSION_STR}
+dpkg_unpack linux-image-"${KERNEL_VERSION_STR}"
 
 # # Manually form-up the kernel and bootfs
 # mkdir -p ${OUT_DIR}/overlays
-mv ${DPKG_ROOT}/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/kernel8.img
+mv "${DPKG_ROOT}"/boot/vmlinuz-"${KERNEL_VERSION_STR}" "${OUT_DIR}"/kernel8.img
 # mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/broadcom/*.dtb ${OUT_DIR}/
 # mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/overlays/*.dtb* ${OUT_DIR}/overlays/
 # mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/overlays/README ${OUT_DIR}/overlays/
@@ -366,8 +370,8 @@ ln -s /bin/udevadm /lib/systemd/systemd-udevd
 cd ..
 
 mkdir build/data/
-cp prebuilts/config.txt ${OUT_DIR}/config.txt
-cp prebuilts/cmdline.txt ${OUT_DIR}/cmdline.txt
+cp prebuilts/config.txt "${OUT_DIR}"/config.txt
+cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 cp prebuilts/cryptkey-fetch build/bin/
 cp prebuilts/vcmailbox build/bin/
 cp prebuilts/vcgencmd build/bin/
@@ -378,18 +382,15 @@ cp prebuilts/rpi-otp-private-key build/usr/local/bin
 cp prebuilts/load_modules.sh build/usr/local/bin/load_modules
 cp prebuilts/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
 
-
-echo "SSH VARIABLE WAS $SSH"
-
-if [ ${SSH} = 1 ]
+if [ "${SSH}" = 1 ]
 then
   echo "Installing SSH!"
   mkdir -p build/root/.ssh
-  echo $(cat prebuilts/authorized_keys) > build/root/.ssh/authorized_keys
+  cat prebuilts/authorized_keys > build/root/.ssh/authorized_keys
   chmod 0600 build/root/.ssh/authorized_keys
   mkdir build/dev/pts
 fi
-echo $(cat prebuilts/authorized_keys) > build/root/.ssh/authorized_keys
+cat prebuilts/authorized_keys > build/root/.ssh/authorized_keys
 chmod 0600 build/root/.ssh/authorized_keys
 mkdir build/dev/pts
 
@@ -404,9 +405,9 @@ kvm:*:1023" >> build/etc/group
 cd build || exit
 find . -print0 | cpio --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
 cd ..
-zstd --no-progress --rm -15 initramfs.cpio -o ${OUT_DIR}/rootfs.cpio.zst
+zstd --no-progress --rm -15 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
 
 echo "Making boot img"
 echo "Out directory = ${OUT_DIR}"
-mkdir -p ${OUT_DIR}
-make-boot-image -d ${OUT_DIR}/ -o ${OUT_IMAGE_NAME} -a ${KERNEL_BIT_SIZE}
+mkdir -p "${OUT_DIR}"
+make-boot-image -d "${OUT_DIR}"/ -o "${OUT_IMAGE_NAME}" -a "${KERNEL_BIT_SIZE}"
