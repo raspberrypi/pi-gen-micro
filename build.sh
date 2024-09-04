@@ -3,7 +3,6 @@
 set -e
 
 # Set up some parameters for building!
-KERNEL_VERSION_STR="6.6.31+rpt-rpi-v8"
 KERNEL_BIT_SIZE=64
 OUT_IMAGE_NAME="boot.img"
 
@@ -254,7 +253,6 @@ dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
 
 # Find kernel
 KERNEL_META=linux-image-rpi-v8
-apt_download "${KERNEL}"
 KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
 KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
 
