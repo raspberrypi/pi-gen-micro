@@ -35,7 +35,7 @@ export DPKG_ROOT=$ROOTFS_DIR
 export TOP="${PWD}"
 
 # Relies on GNU sed extension (/dev/stdin file for 'r' command)
-sed '/^#/d;s/^/    "--/;s/$/";/' cfg/dpkg_extra_args | \
+sed '/^#/d;s/^/    "--/;s/$/";/' cfg/dpkg_extra_args 2>/dev/null | \
 sed "
 s%PWD%${PWD}%
 s%REALROOTREL%$(realpath -s --relative-to="$PWD" /)/%
@@ -46,12 +46,12 @@ export APT_CONFIG=$PWD/apt.cfg
 DPKG_EXTRA_ARGS="$(sed '/^#/d;s/^/--/' "${CONFIGURATION_FOLDER}"/dpkg_extra_args | xargs)"
 
 apt_download() {
-  apt-get install --download-only "$@"
+  apt-get install --download-only "$@" 2>/dev/null
 }
 
 # Can't use install until it's possible to chroot
 apt_install() {
-  apt-get install "$@" --no-install-recommends
+  apt-get install "$@" --no-install-recommends 2>/dev/null
 }
 
 get_package_path() {
@@ -106,7 +106,7 @@ echo '#!/bin/sh' > update-alternatives
 echo 'return 0' >> update-alternatives
 chmod +x update-alternatives
 cp update-alternatives dpkg-trigger
-cd -
+cd - >/dev/null
 
 # awk is Pre-Depends of base-files (unfortunately)
 dpkg_install mawk
@@ -270,7 +270,7 @@ cd "${RASPI_FIRMWARE_TMPDIR}"
 ar -x "$(find "${TOP}"/apt/cache/archives/ -name 'raspi-firmware*' | sort | tail -1)"
 tar xvf data.tar.xz ./
 mv ./usr/lib/raspi-firmware/* "${DPKG_ROOT}"/boot/
-cd -
+cd - >/dev/null
 rm -rf "${RASPI_FIRMWARE_TMPDIR}"
 
 # Find kernel
@@ -309,7 +309,7 @@ do
 	# shellcheck disable=SC2086
 	get_deps $dep
 done
-cd -
+cd - >/dev/null
 printf "
 ${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.order
 ${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.builtin
