@@ -35,7 +35,7 @@ export DPKG_ROOT=$ROOTFS_DIR
 export TOP="${PWD}"
 
 # Relies on GNU sed extension (/dev/stdin file for 'r' command)
-sed '/^#/d;s/^/    "--/;s/$/";/' cfg/dpkg_extra_args 2>/dev/null | \
+sed '/^#/d;s/^/    "--/;s/$/";/' "$CONFIGURATION_FOLDER"/dpkg_extra_args 2>/dev/null | \
 sed "
 s%PWD%${PWD}%
 s%REALROOTREL%$(realpath -s --relative-to="$PWD" /)/%
@@ -127,12 +127,6 @@ dpkg_install base-passwd
 sed --in-place '/^root/ {s/\*//; s/bash/sh/}' build/etc/passwd
 
 dpkg_install base-files
-
-# Manually move the dpkg excludes file into the rootfs
-cp cfg/dpkg.cfg.d/excludes /etc/dpkg/dpkg.cfg.d/excludes
-
-# Manually move the dpkg excludes file into the rootfs
-cp cfg/dpkg.cfg.d/excludes /etc/dpkg/dpkg.cfg.d/excludes
 
 # 'mount' will be installed by systemd below, ensure util-linux dep can be met
 dpkg_unpack util-linux-extra
