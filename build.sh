@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 # Set up some parameters for building!
 KERNEL_VERSION_STR="6.6.31+rpt-rpi-v8"
 KERNEL_BIT_SIZE=64
@@ -24,7 +26,7 @@ mkdir "${OUT_DIR}"
 
 mkdir -p build/usr/bin
 mkdir -p build/usr/lib
-cd build || exit
+cd build
 ln -s usr/bin bin
 ln -s usr/lib lib
 cd ..
@@ -97,14 +99,14 @@ set +o noglob
 
 dpkg_install busybox
 
-cd build/bin || exit
+cd build/bin
 ln -s busybox sh
 ln -s mawk awk
 echo '#!/bin/sh' > update-alternatives
 echo 'return 0' >> update-alternatives
 chmod +x update-alternatives
 cp update-alternatives dpkg-trigger
-cd - || exit
+cd -
 
 # awk is Pre-Depends of base-files (unfortunately)
 dpkg_install mawk
@@ -176,9 +178,9 @@ do
    apt_install "${package}"
 done
 
-cd "${CONFIGURATION_FOLDER}" || exit
+cd "${CONFIGURATION_FOLDER}"
 ./installer_scripts.list
-cd "${TOP}" || exit
+cd "${TOP}"
 
 apt_install kmod
 
@@ -264,11 +266,11 @@ apt-get --fix-broken install
 
 apt_download raspi-firmware
 RASPI_FIRMWARE_TMPDIR=$(mktemp -d)
-cd "${RASPI_FIRMWARE_TMPDIR}" || exit
+cd "${RASPI_FIRMWARE_TMPDIR}"
 ar -x "$(find "${TOP}"/apt/cache/archives/ -name 'raspi-firmware*' | sort | tail -1)"
 tar xvf data.tar.xz ./
 mv ./usr/lib/raspi-firmware/* "${DPKG_ROOT}"/boot/
-cd - || exit
+cd -
 rm -rf "${RASPI_FIRMWARE_TMPDIR}"
 
 # Find kernel
@@ -282,7 +284,7 @@ dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT
 
 # Copy requested kernel modules (+deps) into image and generate module dependencies
 depmod --basedir "${KPKG_EXTRACT}" "${KERNEL_VERSION_STR}"
-cd "${KPKG_EXTRACT}" >/dev/null || exit
+cd "${KPKG_EXTRACT}"
 module_paths=()
 get_deps() {
 	local module_name=$1
@@ -307,7 +309,7 @@ do
 	# shellcheck disable=SC2086
 	get_deps $dep
 done
-cd - || exit
+cd -
 printf "
 ${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.order
 ${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.builtin
@@ -361,7 +363,7 @@ cp -r packages/built/bin/* build/usr/bin/
 # Copy init
 cp prebuilts/init build/init
 # ln build/usr/sbin /sbin
-cd build/sbin || exit
+cd build/sbin
 rm init
 
 ln -s /usr/lib/systemd/systemd init
@@ -402,7 +404,7 @@ systemd-timesync:x:107:
 kvm:*:1023" >> build/etc/group
 
 # Package initramfs
-cd build || exit
+cd build
 find . -print0 | cpio --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
 cd ..
 zstd --no-progress --rm -15 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
