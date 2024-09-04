@@ -1,4 +1,3 @@
 OUT_IMAGE_NAME=boot.img
 KERNEL_BIT_SIZE=64
 OUT_DIR=/mnt/pi-gen-micro/out_image
-KERNEL_VERSION_STR="6.6.31+rpt-rpi-v8"
