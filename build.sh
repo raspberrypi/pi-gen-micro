@@ -132,17 +132,6 @@ dpkg_install base-files
 dpkg_unpack util-linux-extra
 rm -rf build/etc/init.d
 apt-get --fix-broken install
-# We *should* now have a working system for apt.
-# Try to install cryptsetup-bin (+deps) (libgcc-s1 required for pthread_exit)
-apt_install cryptsetup-bin libgcc-s1
-apt_install android-libsparse
-apt_install android-libbase
-apt_install android-liblog
-apt_install zlib1g
-apt_install android-libcutils
-apt_install libfdisk1
-apt_install liburing2
-apt_install openssl
 
 # Tiny debconf for libpam0g (systemd dep)
 apt_install cdebconf-udeb cdebconf-text-udeb
@@ -251,10 +240,6 @@ fi
 dpkg_unpack kmod
 rm -rf build/etc/init.d
 apt-get --fix-broken install
-
-### CUSTOM CHANGES ARE MADE HERE
-#
-### CUSTOM CHANGES ARE MADE HERE
 
 # Boot firmare
 apt_download raspi-firmware
