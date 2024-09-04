@@ -257,15 +257,15 @@ apt-get --fix-broken install
 ### CUSTOM CHANGES ARE MADE HERE
 
 # Boot firmare
-
 apt_download raspi-firmware
-RASPI_FIRMWARE_TMPDIR=$(mktemp -d)
-cd "${RASPI_FIRMWARE_TMPDIR}"
-ar -x "$(find "${TOP}"/apt/cache/archives/ -name 'raspi-firmware*' | sort | tail -1)"
-tar xvf data.tar.xz ./
-mv ./usr/lib/raspi-firmware/* "${DPKG_ROOT}"/boot/
-cd - >/dev/null
-rm -rf "${RASPI_FIRMWARE_TMPDIR}"
+RASPI_FIRMWARE_SUBDIR="./usr/lib/raspi-firmware/"
+PATH_COMPONENTS="$(echo $RASPI_FIRMWARE_SUBDIR | grep -o "/" | wc -l)"
+dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
+	tar \
+		--extract \
+		--directory="${DPKG_ROOT}/boot" \
+		--strip-components="$PATH_COMPONENTS" \
+		$RASPI_FIRMWARE_SUBDIR
 
 # Find kernel
 KERNEL_META=linux-image-rpi-v8
