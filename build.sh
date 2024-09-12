@@ -323,8 +323,6 @@ cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 
 cp prebuilts/cryptkey-fetch build/bin/
-cp prebuilts/vcmailbox build/bin/
-cp prebuilts/vcgencmd build/bin/
 mkdir build/usr/local/bin
 cp prebuilts/rpi-otp-private-key build/usr/local/bin
 
