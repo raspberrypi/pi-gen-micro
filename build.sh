@@ -321,17 +321,6 @@ mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
 
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
-# apt_install debconf
-# # Install Systemd by building into build folder
-# /mnt/install_systemd.sh
-
-#cd components
-#./install_package.sh https://github.com/systemd/systemd.git
-#cd ..
-
-cp -r packages/built/* build/
-cp -r packages/built/lib/* build/usr/lib/
-cp -r packages/built/bin/* build/usr/bin/
 
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
