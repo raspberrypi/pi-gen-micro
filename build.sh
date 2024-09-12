@@ -164,8 +164,6 @@ cd "${CONFIGURATION_FOLDER}"
 ./installer_scripts.list
 cd "${TOP}"
 
-apt_install kmod
-
 if [ "${UDEV}" = 1 ]
 then
   echo "Installing UDEV!"
