@@ -319,7 +319,6 @@ mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb*
 mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
 mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
 
-mkdir build/data/
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 # apt_install debconf
@@ -334,7 +333,6 @@ cp -r packages/built/* build/
 cp -r packages/built/lib/* build/usr/lib/
 cp -r packages/built/bin/* build/usr/bin/
 
-mkdir build/data/
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 cp prebuilts/cryptkey-fetch build/bin/
