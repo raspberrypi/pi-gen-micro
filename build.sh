@@ -212,6 +212,20 @@ ExecStart=
 ExecStart=/bin/true
 " > build/etc/systemd/system/getty-static.service.d/override.conf
 
+# serial-getty waits for device unit (using udev) by default, disable this if
+# udev is not used. Always make a copy of serial-getty@.service in 'etc'.
+if [ "${UDEV}" = 1 ]
+then
+  cp build/usr/lib/systemd/system/serial-getty@.service \
+    build/etc/systemd/system/serial-getty@.service
+else
+  sed '
+  /^BindsTo/d
+  /^After=/s/dev-%i\.device\s*//' \
+    build/usr/lib/systemd/system/serial-getty@.service \
+    > build/etc/systemd/system/serial-getty@.service
+fi
+
 if [ "${AUTOLOGIN}" = 1 ]
 then
   # Ensure getty on tty1 is autologin
@@ -223,14 +237,9 @@ then
   TTYVTDisallocate=no
   " > build/etc/systemd/system/getty@tty1.service.d/autologin.conf
 
-  # serial-getty shouldn't wait for device unit (no udev) and should autologin as
-  # root
-  sed '
-  /^BindsTo/d
-  /^After=/s/dev-%i\.device\s*//
+  sed --in-place '
   s/\(--keep-baud\)/--noclear --autologin root \1/' \
-    build/usr/lib/systemd/system/serial-getty@.service \
-    > build/etc/systemd/system/serial-getty@.service
+    build/etc/systemd/system/serial-getty@.service
 fi
 # Ensure compressed modules can be loaded (busybox implementation of modprobe
 # is insufficient)
