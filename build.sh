@@ -313,26 +313,16 @@ depmod --basedir "${ROOTFS_DIR}" "${KERNEL_VERSION_STR}"
 
 # Manually form-up the kernel and bootfs
 mkdir -p "${OUT_DIR}"/overlays
-# mv ${DPKG_ROOT}/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/zImage
-mv "${DPKG_ROOT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/*.dtb "${OUT_DIR}"/
-mv "${DPKG_ROOT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
-mv "${DPKG_ROOT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
-mv "${DPKG_ROOT}"/boot/* "${OUT_DIR}"/
+mv "${KPKG_EXTRACT}"/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/zImage
+mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/*.dtb "${OUT_DIR}"/
+mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
+mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
+mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
 
 mkdir build/data/
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 # apt_install debconf
-
-dpkg_unpack linux-image-"${KERNEL_VERSION_STR}"
-
-# # Manually form-up the kernel and bootfs
-# mkdir -p ${OUT_DIR}/overlays
-mv "${DPKG_ROOT}"/boot/vmlinuz-"${KERNEL_VERSION_STR}" "${OUT_DIR}"/kernel8.img
-# mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/broadcom/*.dtb ${OUT_DIR}/
-# mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/overlays/*.dtb* ${OUT_DIR}/overlays/
-# mv ${DPKG_ROOT}/usr/lib/linux-image-${KERNEL_VERSION_STR}/overlays/README ${OUT_DIR}/overlays/
-# mv ${DPKG_ROOT}/boot/* ${OUT_DIR}/
 # # Install Systemd by building into build folder
 # /mnt/install_systemd.sh
 
