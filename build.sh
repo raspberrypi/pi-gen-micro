@@ -322,8 +322,6 @@ mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 
-cp prebuilts/config.txt "${OUT_DIR}"/config.txt
-cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 cp prebuilts/cryptkey-fetch build/bin/
 cp prebuilts/vcmailbox build/bin/
 cp prebuilts/vcgencmd build/bin/
