@@ -344,10 +344,6 @@ cp -r packages/built/* build/
 cp -r packages/built/lib/* build/usr/lib/
 cp -r packages/built/bin/* build/usr/bin/
 
-cd build
-ln -s /bin/udevadm /lib/systemd/systemd-udevd
-cd ..
-
 mkdir build/data/
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
