@@ -152,6 +152,9 @@ apt_install systemd-sysv
 rm build/bin/dpkg-maintscript-helper
 rm build/bin/dpkg
 
+# Symlink to regular /sbin/init (systemd-sysv provides /sbin/init)
+ln -s /sbin/init build/init
+
 IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\n' ', ')"
 
 for package in "${array[@]}"
@@ -199,10 +202,6 @@ then
     echo "--------------- ERROR - Network cannot be installed without UDEV Support. This component will not work! --------------------"
   fi
 fi
-
-
-# Symlink to regular /sbin/init
-# ln -s /sbin/init build/init
 
 # getty-static.service starts tty2-tty6 if dbus / logind are not available
 # Override this behaviour
@@ -344,14 +343,8 @@ mv "${DPKG_ROOT}"/boot/vmlinuz-"${KERNEL_VERSION_STR}" "${OUT_DIR}"/kernel8.img
 cp -r packages/built/* build/
 cp -r packages/built/lib/* build/usr/lib/
 cp -r packages/built/bin/* build/usr/bin/
-# Copy init
-cp prebuilts/init build/init
-# ln build/usr/sbin /sbin
-cd build/sbin
-rm init
 
-ln -s /usr/lib/systemd/systemd init
-cd ..
+cd build
 ln -s /bin/udevadm /lib/systemd/systemd-udevd
 cd ..
 
