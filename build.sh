@@ -204,6 +204,14 @@ fi
 # Symlink to regular /sbin/init
 # ln -s /sbin/init build/init
 
+# getty-static.service starts tty2-tty6 if dbus / logind are not available
+# Override this behaviour
+mkdir -p build/etc/systemd/system/getty-static.service.d
+echo "[Service]
+ExecStart=
+ExecStart=/bin/true
+" > build/etc/systemd/system/getty-static.service.d/override.conf
+
 if [ "${AUTOLOGIN}" = 1 ]
 then
   # Ensure getty on tty1 is autologin
@@ -214,14 +222,6 @@ then
   ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin root %I \$TERM
   TTYVTDisallocate=no
   " > build/etc/systemd/system/getty@tty1.service.d/autologin.conf
-
-  # getty-static.service starts tty2-tty6 if dbus / logind are not available
-  # Override this behaviour
-  mkdir -p build/etc/systemd/system/getty-static.service.d
-  echo "[Service]
-  ExecStart=
-  ExecStart=/bin/true
-  " > build/etc/systemd/system/getty-static.service.d/override.conf
 
   # serial-getty shouldn't wait for device unit (no udev) and should autologin as
   # root
