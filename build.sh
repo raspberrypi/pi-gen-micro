@@ -322,9 +322,12 @@ mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 
-## Fix up systemd-modules-load
-cp prebuilts/load_modules.sh build/usr/local/bin/load_modules
-cp prebuilts/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
+# Custom (no udev requirement) systemd-modules-load.service
+if [ -z "${UDEV}" ]
+then
+  cp prebuilts/load_modules.sh build/usr/local/bin/load_modules
+  cp prebuilts/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
+fi
 
 if [ "${SSH}" = 1 ]
 then
