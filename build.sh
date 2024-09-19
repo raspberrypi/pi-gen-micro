@@ -334,9 +334,6 @@ then
   chmod 0600 build/root/.ssh/authorized_keys
   mkdir build/dev/pts
 fi
-cat prebuilts/authorized_keys > build/root/.ssh/authorized_keys
-chmod 0600 build/root/.ssh/authorized_keys
-mkdir build/dev/pts
 
 # Package initramfs
 cd build
