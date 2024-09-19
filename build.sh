@@ -338,13 +338,6 @@ cat prebuilts/authorized_keys > build/root/.ssh/authorized_keys
 chmod 0600 build/root/.ssh/authorized_keys
 mkdir build/dev/pts
 
-sed --in-place 's/bash/sh/g' build/etc/passwd
-echo "systemd-journal:x:104:
-systemd-network:x:105:
-systemd-resolve:x:106:
-systemd-timesync:x:107:
-kvm:*:1023" >> build/etc/group
-
 # Package initramfs
 cd build
 find . -print0 | cpio --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
