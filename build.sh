@@ -322,10 +322,6 @@ mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
 cp prebuilts/config.txt "${OUT_DIR}"/config.txt
 cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
 
-cp prebuilts/cryptkey-fetch build/bin/
-mkdir build/usr/local/bin
-cp prebuilts/rpi-otp-private-key build/usr/local/bin
-
 ## Fix up systemd-modules-load
 cp prebuilts/load_modules.sh build/usr/local/bin/load_modules
 cp prebuilts/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
