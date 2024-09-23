@@ -1,6 +1,25 @@
 = Pi-gen Micro
 Richard Oliver <richard.oliver@raspberrypi.com>
 
+== Building
+```
+sudo apt install dh-virtualenv python3-virtualenv
+dpkg-buildpackage -us -uc -b
+sudo dpkg -i ../pi-gen-micro_0.0.1-1_arm64.deb
+```
+
+== Basic Use
+```
+pushd $(mktemp -d)
+sudo pi-gen-micro fastboot
+```
+
+== Updating packages
+```
+cd packages
+dpkg-scanpackages . /dev/null | gzip -9C > Packages.gz
+```
+
 == Future Directions
 === Automatic udeb generation
 Investigate Debian tooling to automatically turn packages into udebs.  udebs

@@ -1,0 +1,5 @@
+pi-gen-micro (0.0.1-1) unstable; urgency=low
+
+  * Initial packaging
+
+  -- Richard Oliver <richard.oliver@raspberrypi.com> Mon, 30 Sep 2024 14:48:00 +0100
