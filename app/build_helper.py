@@ -171,11 +171,4 @@ def get_default_components():
     return components
 
 def get_configuration_root():
-    f = open("../config", "r")
-    content_by_line = f.read().split("\n")
-    for line in content_by_line:
-        if "CONFIGURATION_ROOT=" in line:
-            cfg_root = line.replace("CONFIGURATION_ROOT=", "")
-            if cfg_root[-1] != "/":
-                cfg_root += "/"
-            return cfg_root
+    return "/etc/pi-gen-micro/configurations/"

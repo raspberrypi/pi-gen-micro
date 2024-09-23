@@ -7,7 +7,11 @@ KERNEL_BIT_SIZE=64
 OUT_IMAGE_NAME="boot.img"
 
 # Overwrite the defaults with that from the build.parameters file
-source config
+: "${CONFIGURATION_ROOT:=/etc/pi-gen-micro/configurations/}"
+
+: "${APT_DPKG_CFG:=/etc/pi-gen-micro/cfg}"
+
+: "${PREBUILTS_DIR:=/usr/share/misc/pi-gen-micro/prebuilts}"
 
 CONFIGURATION_FOLDER="${CONFIGURATION_ROOT}"$1
 
@@ -32,6 +36,14 @@ cd ..
 export ROOTFS_DIR=$PWD/build
 export DPKG_ROOT=$ROOTFS_DIR
 export TOP="${PWD}"
+
+# TODO: Parse from apt.cfg
+mkdir -p apt/cache apt/log apt/state
+
+rsync \
+  --archive \
+  "$APT_DPKG_CFG" \
+  ./
 
 # Relies on GNU sed extension (/dev/stdin file for 'r' command)
 sed '/^#/d;s/^/    "--/;s/$/";/' "$CONFIGURATION_FOLDER"/dpkg_extra_args 2>/dev/null | \
@@ -139,7 +151,7 @@ if [ "${SSH}" = 1 ]
 then
   echo "Installing SSH!"
   apt_install dropbear-bin
-  apt_install ./packages/dropbear-ssh-service_1.0.0_arm64.deb
+  apt_install dropbear-ssh-service
 fi
 
 # TODO: postinst failure, fstrim settings using deb-systemd-helper
@@ -159,13 +171,11 @@ IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\
 
 for package in "${array[@]}"
 do
-   echo "Installing $PWD/${package}"
-   apt_install "$PWD/${package}"
+   echo "Installing ${package}"
+   apt_install "${package}"
 done
 
-cd "${CONFIGURATION_FOLDER}"
-./installer_scripts.list
-cd "${TOP}"
+PATH="${CONFIGURATION_FOLDER}:${PATH}" "${CONFIGURATION_FOLDER}"/installer_scripts.list
 
 if [ "${UDEV}" = 1 ]
 then
@@ -192,7 +202,7 @@ then
   if [ "${UDEV}" = 1 ]
   then
     echo "Installing & Enabling networking"
-    cp prebuilts/20-wired.network build/etc/systemd/network/20-wired.network
+    cp "${PREBUILTS_DIR}"/20-wired.network build/etc/systemd/network/20-wired.network
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/dbus-org.freedesktop.network1.service
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
     ln -s /lib/systemd/system/systemd-networkd.socket build/systemd/system/sockets.target.wants/systemd-networkd.socket
@@ -260,6 +270,7 @@ dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
 # Find kernel
 KERNEL_META=linux-image-rpi-v8
 KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
+apt_download "$KERNEL_PACKAGE"
 KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
 apt_download "${KERNEL_PACKAGE}"
 
@@ -320,21 +331,21 @@ mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb*
 mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
 mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
 
-cp prebuilts/config.txt "${OUT_DIR}"/config.txt
-cp prebuilts/cmdline.txt "${OUT_DIR}"/cmdline.txt
+cp "${PREBUILTS_DIR}"/config.txt "${OUT_DIR}"/config.txt
+cp "${PREBUILTS_DIR}"/cmdline.txt "${OUT_DIR}"/cmdline.txt
 
 # Custom (no udev requirement) systemd-modules-load.service
 if [ -z "${UDEV}" ]
 then
-  cp prebuilts/load_modules.sh build/usr/local/bin/load_modules
-  cp prebuilts/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
+  cp "${PREBUILTS_DIR}"/load_modules.sh build/usr/local/bin/load_modules
+  cp "${PREBUILTS_DIR}"/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
 fi
 
 if [ "${SSH}" = 1 ]
 then
   echo "Installing SSH!"
   mkdir -p build/root/.ssh
-  cat prebuilts/authorized_keys > build/root/.ssh/authorized_keys
+  cat "${PREBUILTS_DIR}"/authorized_keys > build/root/.ssh/authorized_keys
   chmod 0600 build/root/.ssh/authorized_keys
   mkdir build/dev/pts
 fi

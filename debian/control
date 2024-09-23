@@ -1,0 +1,13 @@
+Source: pi-gen-micro
+Section: embedded
+Priority: optional
+Maintainer: Richard Oliver <richard.oliver@raspberrypi.com>
+Build-Depends: debhelper (>= 9), python3, dh-virtualenv (>= 0.8), python3-virtualenv
+Standards-Version: 3.9.5
+Homepage: https://www.raspberrypi.com/software
+
+Package: pi-gen-micro
+Architecture: arm64
+Pre-Depends: dpkg (>= 1.16.1), python3, sed, ${misc:Pre-Depends}
+Depends: rpi-sb-provisioner ${misc:Depends}
+Description: A tool to create cut-down Debian-based OS-images for Raspberry Pi Devices

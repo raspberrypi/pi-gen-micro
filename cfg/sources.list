@@ -2,3 +2,4 @@ deb http://deb.debian.org/debian bookworm main main/debian-installer contrib non
 deb http://deb.debian.org/debian-security/ bookworm-security main contrib non-free non-free-firmware
 deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware
 deb http://archive.raspberrypi.com/debian/ bookworm main
+deb [trusted=yes] file:/usr/share/misc/pi-gen-micro/packages ./
