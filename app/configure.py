@@ -9,7 +9,6 @@ from textual.widget import Widget
 from textual.geometry import Size
 from textual import on
 from textual import events
-import numpy as np
 import build_helper
 from os import listdir, path, mkdir, stat, chmod
 import stat as permissions
