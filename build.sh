@@ -21,7 +21,7 @@ echo "${TARGET_DEVICE}"
 rm -rf build
 rm -f initramfs
 rm -rf "${OUT_DIR}"
-mkdir "${OUT_DIR}"
+mkdir -p "${OUT_DIR}"
 
 mkdir -p build/usr/bin
 mkdir -p build/usr/lib
@@ -159,8 +159,8 @@ IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\
 
 for package in "${array[@]}"
 do
-   echo "Installing ${package}"
-   apt_install "${package}"
+   echo "Installing $PWD/${package}"
+   apt_install "$PWD/${package}"
 done
 
 cd "${CONFIGURATION_FOLDER}"
@@ -261,6 +261,7 @@ dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
 KERNEL_META=linux-image-rpi-v8
 KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
 KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
+apt_download "${KERNEL_PACKAGE}"
 
 KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
 dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
