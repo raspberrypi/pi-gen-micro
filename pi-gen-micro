@@ -282,28 +282,24 @@ depmod --basedir "${KPKG_EXTRACT}" "${KERNEL_VERSION_STR}"
 cd "${KPKG_EXTRACT}"
 module_paths=()
 get_deps() {
-	local module_name=$1
-
-	# shellcheck disable=SC2046
-	readarray -t file_deps <<<$(modinfo --basedir . -k "${KERNEL_VERSION_STR}" "${module_name}" | grep -oP '^(?:filename|depends):\s+\K.*')
-	module_paths+=("${file_deps[0]}")
-
-	if [ ${#file_deps[@]} -eq "2" ]
-	then
-		# shellcheck disable=SC2086
-		readarray -t -d , deps <<<${file_deps[1]}
-		for dep in "${deps[@]}"
-		do
-			# shellcheck disable=SC2086
-			get_deps $dep
-		done
+	if [ "$#" -eq 0 ]; then
+		return
 	fi
+
+	local INFO
+        # shellcheck disable=SC2068
+	INFO="$(modinfo --basedir . -k "${KERNEL_VERSION_STR}" $@ | grep -oP '^(?:filename|depends):\s+\S+')"
+
+	readarray -t filenames <<<"$(grep -oP '^filename:\s+\K.*' <<< "$INFO")"
+	module_paths+=("${filenames[@]}")
+
+	readarray -t depends <<<"$(sed -nE '/^depends:/{s/^depends:\s+//;s/,/\n/;p}' <<< "$INFO" | sort | uniq)"
+        # shellcheck disable=SC2068
+	get_deps ${depends[@]}
 }
-for dep in $(sed '/^#/d' "${CONFIGURATION_FOLDER}"/kernel_modules.list | xargs)
-do
-	# shellcheck disable=SC2086
-	get_deps $dep
-done
+
+# shellcheck disable=SC2046
+get_deps $(sed '/^#/d' "${CONFIGURATION_FOLDER}"/kernel_modules.list | sort | uniq | xargs)
 cd - >/dev/null
 printf "
 ${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.order
