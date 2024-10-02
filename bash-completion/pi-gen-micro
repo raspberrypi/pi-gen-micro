@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+function complete_pi-gen-micro() {
+    if [ "${#COMP_WORDS[@]}" != "2" ]; then
+        return
+    fi
+
+    local PGM_CONFS="$( \
+        echo $( \
+            find \
+                /etc/pi-gen-micro/configurations \
+                -mindepth 1 \
+                -maxdepth 1 \
+                -type d \
+                -printf '%P\n' \
+        ) \
+    )"
+
+    COMPREPLY=($(compgen -W "${PGM_CONFS}" -- "${COMP_WORDS[1]}"))
+}
+
+complete -F complete_pi-gen-micro pi-gen-micro
