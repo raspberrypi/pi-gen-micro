@@ -1,8 +1,3 @@
-# A list of kernel modules (or their aliases) to be included
-# in the generated image. Depencies are automatically discovered and included
-# also. modules.dep is also automatically generatesd.
-# 
-# e.g: Uncommenting the line below would include usb_f_ffs.ko.xz and
-# libcomposite.ko.xz:
-#
-# usbfunc:ffs
+dm-crypt
+algif_skcipher
+crypto-xts(aes)
