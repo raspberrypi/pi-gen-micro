@@ -1,3 +1,15 @@
+pi-gen-micro (0.1.0-1) unstable; urgency=low
+
+  - Remove python dependencies
+  - bash completions
+  - Improve kernel_modules.list resiliance
+  - Firmware / Kernel module / zImage copy-errors addressed
+  - Fixes for fastboot / cryptroot_image
+  - fastboot: Kernel modules + UDEV
+  - Various fixes to pre-packaged debs
+
+ --  Richard Oliver <richard.oliver@raspberrypi.com>  Thu, 03 Oct 2024 16:41:47 +0100
+
 pi-gen-micro (0.0.1-1) unstable; urgency=low
 
   * Initial packaging
