@@ -1,3 +1,5 @@
 #!/bin/sh
 
+set -e
+
 LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/android/ /usr/bin/fastbootd -v -i tcp

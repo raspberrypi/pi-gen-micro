@@ -5,14 +5,17 @@
 name: "fastboot-tcp"
 arch: "arm64"
 platform: "linux"
-version: "1.0.0"
+version: "1.0.1"
 section: "default"
 priority: "extra"
 maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
 
+depends:
+  - rpi-fastbootd (>= 14)
+
 contents:
 - src: ./run_fastboot_tcp
-  dst: /usr/local/bin/run_fastboot_tcp
+  dst: /usr/bin/run_fastboot_tcp
 - src: ./fastboot-tcp.service
   dst: /etc/systemd/system/fastboot-tcp.service
 - src: /etc/systemd/system/fastboot-tcp.service
