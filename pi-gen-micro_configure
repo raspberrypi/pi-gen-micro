@@ -1,4 +1,0 @@
-#!/bin/sh
-
-cd /usr/share/pi-gen-micro/app
-/opt/venvs/pi-gen-micro/bin/python3 configure.py

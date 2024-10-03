@@ -1,4 +1,0 @@
-SSH: can enable or disable ssh from here
-UDEV: Adds udev support
-NETWORK: Connects to ethernet network - requires UDEV
-AUTOLOGIN: Autologin to root
