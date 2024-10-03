@@ -15,6 +15,8 @@ depends:
   - cryptsetup-bin
   - libgcc-s1
   - openssl
+  - xxd
+  - base64
 
 contents:
 - src: ./init_cryptroot.sh
