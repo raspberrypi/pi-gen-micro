@@ -80,7 +80,7 @@ fi
 
 read_key
 
-echo "${READ_KEY}" | xxd -r -p | base64 -w0
+echo "${READ_KEY}" | xxd -r -p | busybox base64 -w0
 
 if [ -z "$(echo "${READ_KEY}" | sed s/0//g)" ]; then
     return 1
