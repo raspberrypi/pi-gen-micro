@@ -16,7 +16,7 @@ depends:
   - libgcc-s1
   - openssl
   - xxd
-  - base64
+  - busybox
 
 contents:
 - src: ./init_cryptroot.sh
