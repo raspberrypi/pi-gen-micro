@@ -314,6 +314,7 @@ rsync \
 	--owner \
 	--acls \
 	--xattrs \
+	--keep-dirlinks \
 	--files-from=- \
 	/ \
 	"${ROOTFS_DIR}/"
