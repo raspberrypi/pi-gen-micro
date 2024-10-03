@@ -8,7 +8,7 @@ After=systemd-modules-load.service
 [Service]
 Type=oneshot
 WorkingDirectory=/sys/kernel/config/usb_gadget
-ExecStart=/usr/local/bin/configure-gadgets
+ExecStart=/usr/bin/configure-gadgets
 StandardOutput=journal+console
 
 [Install]
