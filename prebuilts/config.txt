@@ -46,7 +46,7 @@ arm_boost=1
 # otg_mode=1
 
 [all]
-kernel=kernel8.img
+kernel=zImage
 initramfs rootfs.cpio.zst
 dtoverlay=dwc2,dr_mode=peripheral
 dtparam=uart0=on
