@@ -263,7 +263,7 @@ PATH_COMPONENTS="$(echo $RASPI_FIRMWARE_SUBDIR | grep -o "/" | wc -l)"
 dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
 	tar \
 		--extract \
-		--directory="${DPKG_ROOT}/boot" \
+		--directory="${OUT_DIR}/" \
 		--strip-components="$PATH_COMPONENTS" \
 		$RASPI_FIRMWARE_SUBDIR
 
