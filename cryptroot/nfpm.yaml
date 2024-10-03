@@ -5,7 +5,7 @@
 name: "cryptroot-package"
 arch: "arm64"
 platform: "linux"
-version: "1.0.0"
+version: "1.0.1"
 section: "default"
 priority: "extra"
 
@@ -18,17 +18,17 @@ depends:
 
 contents:
 - src: ./init_cryptroot.sh
-  dst: /usr/local/bin/init_cryptroot.sh
+  dst: /usr/bin/init_cryptroot.sh
 - src: cryptroot.service
   dst: /etc/systemd/system/cryptroot.service
 - src: /etc/systemd/system/cryptroot.service
   dst: /etc/systemd/system/multi-user.target.wants/cryptroot.service
   type: symlink
 - src: cryptkey-fetch
-  dst: /bin/cryptkey-fetch
+  dst: /usr/bin/cryptkey-fetch
 - src: vcgencmd
-  dst: /bin/vcgencmd
+  dst: /usr/bin/vcgencmd
 - src: vcmailbox
-  dst: /bin/vcmailbox
-- src: rpi-otp-private-key
-  dst: /usr/local/bin/rpi-otp-private-key
+  dst: /usr/bin/vcmailbox
+deb:
+  compression: zstd

@@ -1,9 +1,8 @@
 [Unit]
-Description=Cryptroot init
-After=fastbootd.service
+Description=Unlock and pivot root into a pre-defined LUKS container
 
 [Service]
-ExecStart=/usr/local/bin/init_cryptroot.sh
+ExecStart=/usr/bin/init_cryptroot.sh
 StandardOutput=file:/cryptroot_stdout.log
 StandardError=file:/cryptroot_stderr.log
 
