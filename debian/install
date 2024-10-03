@@ -1,6 +1,4 @@
 pi-gen-micro /usr/bin
-pi-gen-micro_configure /usr/bin
-app /usr/share/pi-gen-micro
 configurations /etc/pi-gen-micro
 cfg /etc/pi-gen-micro
 packages /usr/share/misc/pi-gen-micro
