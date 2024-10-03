@@ -5,14 +5,14 @@
 name: "mass-storage-gadget"
 arch: "arm64"
 platform: "linux"
-version: "1.0.0"
+version: "1.0.1"
 section: "default"
 priority: "extra"
 maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
 
 contents:
 - src: ./configure-gadgets
-  dst: /usr/local/bin/configure-gadgets
+  dst: /usr/bin/configure-gadgets
 - src: ./systemd-mass-storage-gadget.service
   dst: /etc/systemd/system/systemd-mass-storage-gadget.service
 - src: /etc/systemd/system/systemd-mass-storage-gadget.service
