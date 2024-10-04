@@ -17,7 +17,7 @@ sudo pi-gen-micro fastboot
 == Updating packages
 ```
 cd packages
-dpkg-scanpackages . /dev/null | gzip -9C > Packages.gz
+dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
 ```
 
 == Future Directions
