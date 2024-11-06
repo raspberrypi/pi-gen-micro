@@ -2,12 +2,12 @@ Source: pi-gen-micro
 Section: embedded
 Priority: optional
 Maintainer: Richard Oliver <richard.oliver@raspberrypi.com>
-Build-Depends: debhelper (>= 9)
+Build-Depends: debhelper (>= 13)
 Standards-Version: 3.9.5
 Homepage: https://www.raspberrypi.com/software
 
 Package: pi-gen-micro
 Architecture: arm64
 Pre-Depends: dpkg (>= 1.16.1), sed
-Depends: rpi-sb-provisioner
+Depends:
 Description: A tool to create cut-down Debian-based OS-images for Raspberry Pi Devices
