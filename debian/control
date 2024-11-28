@@ -9,5 +9,5 @@ Homepage: https://www.raspberrypi.com/software
 Package: pi-gen-micro
 Architecture: arm64
 Pre-Depends: dpkg (>= 1.16.1), sed
-Depends: rpi-sb-provisioner
+Depends: rpi-make-boot-image
 Description: A tool to create cut-down Debian-based OS-images for Raspberry Pi Devices

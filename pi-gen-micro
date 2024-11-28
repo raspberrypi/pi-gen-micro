@@ -356,4 +356,4 @@ zstd --no-progress --rm -15 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
 echo "Making boot img"
 echo "Out directory = ${OUT_DIR}"
 mkdir -p "${OUT_DIR}"
-make-boot-image -d "${OUT_DIR}"/ -o "${OUT_IMAGE_NAME}" -a "${KERNEL_BIT_SIZE}"
+rpi-make-boot-image -d "${OUT_DIR}"/ -o "${OUT_IMAGE_NAME}" -a "${KERNEL_BIT_SIZE}"
