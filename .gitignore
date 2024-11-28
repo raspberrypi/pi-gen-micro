@@ -1,0 +1,4 @@
+debian/pi-gen-micro**
+debian/.debhelper**
+debian/files
+debian/debhelper-build-stamp
