@@ -1,3 +1,25 @@
+pi-gen-micro (0.2.0-1) bookworm; urgency=medium
+
+  [ Tom Dewey ]
+  * cryptroot: Match cryptkey-fetch output to rpi-otp-private-key use
+  * cryptroot: Use busybox base64, update package
+  * cryproot: Depend on busybox, update package
+  * cryptroot: Reintroduce module insertion
+  * debian/control: Use DH 13, drop sb-provisioner depends
+  * Update README
+  * Remove extraneous files
+  * gitignore: Initial commit
+  * README: Add devscripts install instruction
+  * cryptroot: Update to remove manual kernel module insertion
+
+  [ Richard Oliver ]
+  * README: Fix Packages.gz generation instructions
+  * cryptroot: Include v1.0.1 in Packages.gz
+  * Depend on rpi-make-boot-image package/script
+  * adiantum support for fastboot/cryptroot_image
+
+ -- Richard Oliver <richard.oliver@raspberrypi.com>  Wed, 11 Dec 2024 15:36:21 +0000
+
 pi-gen-micro (0.1.0-1) unstable; urgency=low
 
   - Remove python dependencies
