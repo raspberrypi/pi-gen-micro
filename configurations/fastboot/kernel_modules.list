@@ -10,3 +10,7 @@ usbfunc:ffs
 dm-crypt
 algif_skcipher
 crypto-xts(aes)
+# adiantum
+crypto-nhpoly1305
+crypto-xchacha12
+crypto-adiantum
