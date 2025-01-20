@@ -29,35 +29,17 @@ add_v6_to_fastboot_cfg() {
 # Get the candidate IP addresses from hostname -I
 IP_ADDRESSES=$(hostname -I)
 
-# Initialize array for IPv4 addresses
-IPV4_ADDRESSES=""
-IPV6_ADDRESSES=""
-
 # Process each IP address
+v4counter=0
+v6counter=0
 for ip in $IP_ADDRESSES; do
     if is_ipv4 "$ip"; then
-        IPV4_ADDRESSES="$IPV4_ADDRESSES $ip"
+        add_v4_to_fastboot_cfg "$ip" "$v4counter"
+        v4counter=$((v4counter + 1))
     elif is_ipv6 "$ip"; then
-        IPV6_ADDRESSES="$IPV6_ADDRESSES $ip"
+        add_v6_to_fastboot_cfg "$ip" "$v6counter"
+        v6counter=$((v6counter + 1))
     else
         echo "Unknown IP format: $ip" >&2
     fi
 done
-
-# Trim leading space
-IPV4_ADDRESSES=$(echo "$IPV4_ADDRESSES" | sed 's/^ *//')
-IPV6_ADDRESSES=$(echo "$IPV6_ADDRESSES" | sed 's/^ *//')
-
-v4counter=0
-for v4address in $IPV4_ADDRESSES; do
-    add_v4_to_fastboot_cfg "$v4address" "$v4counter"
-    v4counter=$((v4counter + 1))
-done
-
-v6counter=0
-for v6address in $IPV6_ADDRESSES; do
-    add_v6_to_fastboot_cfg "$v6address" "$v6counter"
-    v6counter=$((v6counter + 1))
-done
-
-
