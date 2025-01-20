@@ -16,10 +16,17 @@ depends:
 contents:
 - src: ./run_fastboot_tcp
   dst: /usr/bin/run_fastboot_tcp
+- src: ./network-data-propagate.service
+  dst: /usr/bin/network-data-propagate
 - src: ./fastboot-tcp.service
   dst: /etc/systemd/system/fastboot-tcp.service
 - src: /etc/systemd/system/fastboot-tcp.service
   dst: /etc/systemd/system/multi-user.target.wants/fastboot-tcp.service
+  type: symlink
+- src: ./network-data-propagate.service
+  dst: /etc/systemd/system/network-data-propagate.service
+- src: /etc/systemd/system/network-data-propagate.service
+  dst: /etc/systemd/system/multi-user.target.wants/network-data-propagate.service
   type: symlink
 
 deb:
