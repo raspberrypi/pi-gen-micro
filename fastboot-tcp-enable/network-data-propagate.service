@@ -1,0 +1,11 @@
+[Unit]
+Description=Network Data propagation into Fastboot
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/network-data-propagate
+Restart=never
+
+[Install]
+WantedBy=multi-user.target

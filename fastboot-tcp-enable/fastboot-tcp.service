@@ -1,6 +1,6 @@
 [Unit]
 Description=Fastbootd
-After=systemd-networkd.service
+After=network-data-propagate.service
 
 [Service]
 Type=simple
