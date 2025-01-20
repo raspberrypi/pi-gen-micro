@@ -16,7 +16,7 @@ depends:
 contents:
 - src: ./run_fastboot_tcp
   dst: /usr/bin/run_fastboot_tcp
-- src: ./network-data-propagate.service
+- src: ./network-data-propagate
   dst: /usr/bin/network-data-propagate
 - src: ./fastboot-tcp.service
   dst: /etc/systemd/system/fastboot-tcp.service
