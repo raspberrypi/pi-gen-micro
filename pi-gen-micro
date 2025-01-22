@@ -5,6 +5,7 @@ set -e
 # Set up some parameters for building!
 KERNEL_BIT_SIZE=64
 OUT_IMAGE_NAME="boot.img"
+OUT_2710_NAME="2710_bootfiles.bin"
 
 # Overwrite the defaults with that from the build.parameters file
 : "${CONFIGURATION_ROOT:=/etc/pi-gen-micro/configurations/}"
@@ -357,3 +358,10 @@ echo "Making boot img"
 echo "Out directory = ${OUT_DIR}"
 mkdir -p "${OUT_DIR}"
 rpi-make-boot-image -d "${OUT_DIR}"/ -o "${OUT_IMAGE_NAME}" -a "${KERNEL_BIT_SIZE}"
+
+echo "Making 2710 bootfiles"
+mkdir 2710
+mount --bind "${OUT_DIR}" 2710
+tar --create --file "${OUT_2710_NAME}" 2710
+umount 2710
+rmdir 2710
