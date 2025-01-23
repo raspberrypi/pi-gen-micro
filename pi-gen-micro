@@ -205,7 +205,7 @@ then
     cp "${PREBUILTS_DIR}"/20-wired.network build/etc/systemd/network/20-wired.network
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/dbus-org.freedesktop.network1.service
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
-    ln -s /lib/systemd/system/systemd-networkd.socket build/systemd/system/sockets.target.wants/systemd-networkd.socket
+    ln -s /lib/systemd/system/systemd-networkd.socket build/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
     ln -s /lib/systemd/system/systemd-network-generator.service build/etc/systemd/system/sysinit.target.wants/systemd-network-generator.service
     ln -s /lib/systemd/system/systemd-networkd-wait-online.service build/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service
   else
