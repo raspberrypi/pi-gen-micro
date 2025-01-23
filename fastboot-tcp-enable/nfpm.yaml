@@ -12,6 +12,7 @@ maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
 
 depends:
   - rpi-fastbootd (>= 14)
+  - hostname
 
 contents:
 - src: ./run_fastboot_tcp
