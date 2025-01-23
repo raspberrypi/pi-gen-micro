@@ -1,2 +1,2 @@
-SSH=1
 UDEV=1
+NETWORK=1
