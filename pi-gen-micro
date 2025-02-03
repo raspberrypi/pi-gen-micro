@@ -135,9 +135,6 @@ dpkg_install libselinux1
 dpkg_install libdebconfclient0
 dpkg_install base-passwd
 
-# Allow root login without password (and use busybox shell)
-sed --in-place '/^root/ {s/\*//; s/bash/sh/}' build/etc/passwd
-
 dpkg_install base-files
 
 # 'mount' will be installed by systemd below, ensure util-linux dep can be met
