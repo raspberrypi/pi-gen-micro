@@ -201,10 +201,15 @@ then
   then
     echo "Installing & Enabling networking"
     cp "${PREBUILTS_DIR}"/20-wired.network build/etc/systemd/network/20-wired.network
+    mkdir -p build/etc/systemd/system
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/dbus-org.freedesktop.network1.service
+    mkdir -p build/etc/systemd/system/multi-user.target.wants
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
+    mkdir -p build/etc/systemd/system/sockets.target.wants
     ln -s /lib/systemd/system/systemd-networkd.socket build/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
+    mkdir -p build/etc/systemd/system/sysinit.target.wants
     ln -s /lib/systemd/system/systemd-network-generator.service build/etc/systemd/system/sysinit.target.wants/systemd-network-generator.service
+    mkdir -p build/etc/systemd/system/network-online.target.wants
     ln -s /lib/systemd/system/systemd-networkd-wait-online.service build/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service
   else
     echo "--------------- ERROR - Network cannot be installed without UDEV Support. This component will not work! --------------------"
