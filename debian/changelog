@@ -1,3 +1,18 @@
+pi-gen-micro (0.3.0) bookworm; urgency=critical
+
+  * Non-maintainer upload
+
+  [ Tom Dewey ]
+  * fastboot-tcp: Add automatic IPv4, V6 address variables
+  * fastboot-tcp: Include v1.0.2 in Packages.gz
+  * fastboot: Disable SSH
+  * fastboot: Enable networking
+  * cryptroot: Add support for Zero 2 W
+  * bug: Incorrect network systemd unit symlink
+  * security: Delete passwordless root access
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Mon, 03 Feb 2025 12:00:00 +0000
+
 pi-gen-micro (0.2.0-1) bookworm; urgency=medium
 
   [ Tom Dewey ]
@@ -36,4 +51,4 @@ pi-gen-micro (0.0.1-1) unstable; urgency=low
 
   * Initial packaging
 
-  -- Richard Oliver <richard.oliver@raspberrypi.com> Mon, 30 Sep 2024 14:48:00 +0100
+ -- Richard Oliver <richard.oliver@raspberrypi.com> Mon, 30 Sep 2024 14:48:00 +0100
