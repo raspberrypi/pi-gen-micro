@@ -45,6 +45,12 @@ arm_boost=1
 # (e.g. for USB device mode) or if USB support is not required.
 # otg_mode=1
 
+[pi5]
+# Limit clock frequencies because this is likely to be powered 
+# via USB-3 port
+arm_freq=1000
+gpu_freq=500
+
 [all]
 kernel=zImage
 initramfs rootfs.cpio.zst
@@ -54,9 +60,3 @@ enable_uart=1
 uart_2ndstage=1
 # initramfs initramfs
 # device_tree=bcm2711-rpi-cm4-io.dtb
-
-[pi5]
-# Limit clock frequencies because this is likely to be powered 
-# via USB-3 port
-arm_freq=1000
-gpu_freq=500
