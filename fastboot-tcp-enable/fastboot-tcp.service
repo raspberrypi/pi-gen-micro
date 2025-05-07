@@ -1,6 +1,6 @@
 [Unit]
 Description=Fastbootd
-After=network-data-propagate.service
+After=network-online.target
 
 [Service]
 Type=simple

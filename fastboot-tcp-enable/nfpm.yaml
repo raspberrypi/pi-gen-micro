@@ -1,33 +1,23 @@
-# nfpm example configuration file
-#
-# check https://nfpm.goreleaser.com/configuration for detailed usage
+# Enable fastboot over TCP
 #
 name: "fastboot-tcp"
 arch: "arm64"
 platform: "linux"
-version: "1.0.2"
+version: "1.1.0"
 section: "default"
 priority: "extra"
 maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
 
 depends:
   - rpi-fastbootd (>= 14)
-  - hostname
 
 contents:
 - src: ./run_fastboot_tcp
   dst: /usr/bin/run_fastboot_tcp
-- src: ./network-data-propagate
-  dst: /usr/bin/network-data-propagate
 - src: ./fastboot-tcp.service
   dst: /etc/systemd/system/fastboot-tcp.service
 - src: /etc/systemd/system/fastboot-tcp.service
   dst: /etc/systemd/system/multi-user.target.wants/fastboot-tcp.service
-  type: symlink
-- src: ./network-data-propagate.service
-  dst: /etc/systemd/system/network-data-propagate.service
-- src: /etc/systemd/system/network-data-propagate.service
-  dst: /etc/systemd/system/multi-user.target.wants/network-data-propagate.service
   type: symlink
 
 deb:
