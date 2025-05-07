@@ -1,3 +1,4 @@
 rpi-fastbootd
 cryptsetup-bin
 gpiod
+fastboot-tcp-enable
