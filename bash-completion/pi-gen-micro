@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 function complete_pi-gen-micro() {
     if [ "${#COMP_WORDS[@]}" != "2" ]; then
         return
