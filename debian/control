@@ -8,6 +8,15 @@ Homepage: https://www.raspberrypi.com/software
 
 Package: pi-gen-micro
 Architecture: arm64
-Pre-Depends: dpkg (>= 1.16.1), sed
-Depends: rpi-make-boot-image
-Description: A tool to create cut-down Debian-based OS-images for Raspberry Pi Devices
+Pre-Depends: dpkg (>= 1.16.1)
+Depends: rpi-make-boot-image, sed (>= 4.9), libc6 (>= 2.36), bash (>= 5.2)
+Description: Tool to create cut-down Debian-based OS-images for Raspberry Pi Devices
+ pi-gen-micro is a lightweight tool for creating minimal Debian-based
+ operating system images optimized for Raspberry Pi devices. It allows
+ for customization of the base system while maintaining a small footprint,
+ making it ideal for embedded systems and IoT applications that require
+ a compact, efficient OS with the reliability of Debian, and the enhanced
+ features of Raspberry Pi OS.
+ .
+ This package includes utilities and scripts necessary for building
+ custom Raspberry Pi OS images with reduced size and resource requirements.
