@@ -3,3 +3,10 @@
 %:
 	dh $@
 
+override_dh_auto_build:
+	dh_auto_build
+	mkdir -p packages
+
+binary: binary-arch binary-indep
+	cd packages && dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
+
