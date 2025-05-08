@@ -8,11 +8,11 @@ OUT_IMAGE_NAME="boot.img"
 OUT_2710_NAME="2710_bootfiles.bin"
 
 # Overwrite the defaults with that from the build.parameters file
-: "${CONFIGURATION_ROOT:=/etc/pi-gen-micro/configurations/}"
+: "${CONFIGURATION_ROOT:=/var/lib/pi-gen-micro/configurations/}"
 
-: "${APT_DPKG_CFG:=/etc/pi-gen-micro/cfg}"
+: "${APT_DPKG_CFG:=/var/lib/pi-gen-micro/cfg}"
 
-: "${PREBUILTS_DIR:=/usr/share/misc/pi-gen-micro/prebuilts}"
+: "${PREBUILTS_DIR:=/var/lib/pi-gen-micro/prebuilts}"
 
 CONFIGURATION_FOLDER="${CONFIGURATION_ROOT}"$1
 

@@ -8,7 +8,7 @@ function complete_pi-gen-micro() {
     local PGM_CONFS="$( \
         echo $( \
             find \
-                /etc/pi-gen-micro/configurations \
+                /var/lib/pi-gen-micro/configurations \
                 -mindepth 1 \
                 -maxdepth 1 \
                 -type d \
