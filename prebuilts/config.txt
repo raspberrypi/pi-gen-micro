@@ -39,9 +39,7 @@ disable_overscan=1
 # Run as fast as firmware / board allows
 arm_boost=1
 
-# Ask the Zero 2-class firmware to run the firmware in the minimal-footprint
-# mode. This is required to avoid OOM with fastboot and friends.
-[pi02]
+# Ask any device with 512M to reduce the amount of memory given to the GPU
 gpu_mem_512=16
 
 [cm4]
