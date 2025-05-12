@@ -14,3 +14,5 @@ crypto-xts(aes)
 crypto-nhpoly1305
 crypto-xchacha12
 crypto-adiantum
+# For fastboot
+ipv6
