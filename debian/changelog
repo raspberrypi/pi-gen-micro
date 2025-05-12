@@ -8,11 +8,12 @@ pi-gen-micro (0.4.0) unstable; urgency=medium
   * fastboot: Add automatic IPv4, V6 address variables
   * fastboot: Initial provisioning plan support
   * fastboot: gpioset support
+  * fastboot: Add IPv6 support
   * packaging: Add debian/copyright
   * packaging: Move to var/lib/pi-gen-micro
   * packaging: Lintian fixes
 
- -- Tom Dewey <tom.dewey@raspberrypi.com>  Thu, 08 May 2025 12:00:00 +0000
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Mon, 12 May 2025 12:00:00 +0000
 
 pi-gen-micro (0.3.0) unstable; urgency=critical
 
