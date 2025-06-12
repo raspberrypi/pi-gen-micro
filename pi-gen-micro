@@ -165,16 +165,6 @@ rm build/bin/dpkg
 # Symlink to regular /sbin/init (systemd-sysv provides /sbin/init)
 ln -s /sbin/init build/init
 
-IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\n' ', ')"
-
-for package in "${array[@]}"
-do
-   echo "Installing ${package}"
-   apt_install "${package}"
-done
-
-PATH="${CONFIGURATION_FOLDER}:${PATH}" "${CONFIGURATION_FOLDER}"/installer_scripts.list
-
 if [ "${UDEV}" = 1 ]
 then
   echo "Installing UDEV!"
@@ -194,6 +184,16 @@ then
   rm -rf build/etc/init.d
   apt-get --fix-broken install
 fi
+
+IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\n' ', ')"
+
+for package in "${array[@]}"
+do
+   echo "Installing ${package}"
+   apt_install "${package}"
+done
+
+PATH="${CONFIGURATION_FOLDER}:${PATH}" "${CONFIGURATION_FOLDER}"/installer_scripts.list
 
 if [ "${NETWORK}" = 1 ]
 then
