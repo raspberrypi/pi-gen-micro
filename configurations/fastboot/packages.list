@@ -2,3 +2,4 @@ rpi-fastbootd
 cryptsetup-bin
 gpiod
 fastboot-tcp
+kpartx
