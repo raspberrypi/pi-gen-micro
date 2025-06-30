@@ -92,22 +92,33 @@ apt-get update
 mkdir -p build/var/lib/dpkg
 touch build/var/lib/dpkg/lock-frontend
 
-# Download, patch, install libc6-udeb
-apt_download libc6-udeb
-PACKAGE_PATH="$(get_package_path libc6-udeb)"
-EXTRACT_DIR="$(mktemp --directory --tmpdir deb-extract.XXX)"
-dpkg-deb --raw-extract "${PACKAGE_PATH}" "${EXTRACT_DIR}"
-rm "${PACKAGE_PATH}"
-LIBC_VERSION="$(grep -oP '^Version:\s*\K.*' "${EXTRACT_DIR}"/DEBIAN/control)"
-sed --in-place "/^Provides:/s/libc6,/libc6 (= ${LIBC_VERSION}),/" "${EXTRACT_DIR}/DEBIAN/control"
-echo "Replaces: libc6 (= ${LIBC_VERSION})
-Conflicts: libc6 (= ${LIBC_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/control"
-dpkg-deb --build "${EXTRACT_DIR}" "${PACKAGE_PATH}"
-rm -rf "${EXTRACT_DIR}"
-set -o noglob
-# shellcheck disable=SC2086
-dpkg ${DPKG_EXTRA_ARGS} --install "${PACKAGE_PATH}"
-set +o noglob
+# Function to download, patch, and install udeb substitute packages
+install_udeb_substitute() {
+  local udeb_package="$1"
+  local base_package="${udeb_package%-udeb}"
+
+  apt_download "$udeb_package"
+  PACKAGE_PATH="$(get_package_path "$udeb_package")"
+  EXTRACT_DIR="$(mktemp --directory --tmpdir deb-extract.XXX)"
+  dpkg-deb --raw-extract "${PACKAGE_PATH}" "${EXTRACT_DIR}"
+  rm "${PACKAGE_PATH}"
+
+  PACKAGE_VERSION="$(grep -oP '^Version:\s*\K.*' "${EXTRACT_DIR}"/DEBIAN/control)"
+  sed --in-place "/^Provides:/s/${base_package},/${base_package} (= ${PACKAGE_VERSION}),/" "${EXTRACT_DIR}/DEBIAN/control"
+  echo "Replaces: ${base_package} (= ${PACKAGE_VERSION})
+Conflicts: ${base_package} (= ${PACKAGE_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/control"
+
+  dpkg-deb --build "${EXTRACT_DIR}" "${PACKAGE_PATH}"
+  rm -rf "${EXTRACT_DIR}"
+
+  set -o noglob
+  # shellcheck disable=SC2086
+  dpkg ${DPKG_EXTRA_ARGS} --install "${PACKAGE_PATH}"
+  set +o noglob
+}
+
+# Download, patch, install udeb substitute packages
+install_udeb_substitute libc6-udeb
 
 dpkg_install busybox
 
