@@ -129,6 +129,10 @@ echo '#!/bin/sh' > update-alternatives
 echo 'return 0' >> update-alternatives
 chmod +x update-alternatives
 cp update-alternatives dpkg-trigger
+cp update-alternatives dpkg-maintscript-helper
+cp update-alternatives dpkg-divert
+cp update-alternatives deb-systemd-helper
+cp update-alternatives dpkg
 cd - >/dev/null
 
 # awk is Pre-Depends of base-files (unfortunately)
@@ -166,12 +170,8 @@ fi
 # TODO: postinst failure, fstrim settings using deb-systemd-helper
 apt_install util-linux
 
-# Install systemd and symlinks
-cp build/bin/update-alternatives build/bin/dpkg-maintscript-helper
-cp build/bin/update-alternatives build/bin/dpkg
+# Install systemd
 apt_install systemd-sysv
-rm build/bin/dpkg-maintscript-helper
-rm build/bin/dpkg
 
 # Symlink to regular /sbin/init (systemd-sysv provides /sbin/init)
 ln -s /sbin/init build/init
@@ -183,9 +183,7 @@ then
   apt_install libc-bin
 
   # Setup passwd (udev dep)
-  cp build/bin/update-alternatives build/bin/dpkg-maintscript-helper
   apt_install passwd
-  rm build/bin/dpkg-maintscript-helper
 
   # Install perl-base, addgroup dep (used by udev postinst)
   apt_install perl-base
@@ -203,6 +201,9 @@ do
    echo "Installing ${package}"
    apt_install "${package}"
 done
+
+rm build/bin/dpkg-*
+rm build/bin/dpkg
 
 PATH="${CONFIGURATION_FOLDER}:${PATH}" "${CONFIGURATION_FOLDER}"/installer_scripts.list
 
