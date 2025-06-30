@@ -1,0 +1,24 @@
+# nfpm example configuration file
+#
+# check https://nfpm.goreleaser.com/configuration for detailed usage
+#
+name: "cryptkey-fetch-otp"
+arch: "arm64"
+platform: "linux"
+version: "1.0.0"
+section: "default"
+priority: "extra"
+
+maintainer: "Richard Oliver <richard.oliver@raspberrypi.com>"
+
+depends: 
+  - busybox
+  - xxd
+  - raspi-utils-core
+
+contents:
+- src: cryptkey-fetch
+  dst: /usr/bin/cryptkey-fetch
+
+deb:
+  compression: zstd
