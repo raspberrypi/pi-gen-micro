@@ -5,7 +5,7 @@
 name: "cryptroot-package"
 arch: "arm64"
 platform: "linux"
-version: "1.1.0"
+version: "1.2.0"
 section: "default"
 priority: "extra"
 
@@ -13,10 +13,8 @@ maintainer: "Richard Oliver <richard.oliver@raspberrypi.com>"
 
 depends:
   - cryptsetup-bin
+  - cryptkey-fetch-otp
   - libgcc-s1
-  - openssl
-  - xxd
-  - busybox
 
 contents:
 - src: ./init_cryptroot.sh
@@ -26,11 +24,6 @@ contents:
 - src: /etc/systemd/system/cryptroot.service
   dst: /etc/systemd/system/multi-user.target.wants/cryptroot.service
   type: symlink
-- src: cryptkey-fetch
-  dst: /usr/bin/cryptkey-fetch
-- src: vcgencmd
-  dst: /usr/bin/vcgencmd
-- src: vcmailbox
-  dst: /usr/bin/vcmailbox
+
 deb:
   compression: zstd
