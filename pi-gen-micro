@@ -305,7 +305,7 @@ get_deps() {
         # shellcheck disable=SC2068
 	INFO="$(modinfo --basedir . -k "${KERNEL_VERSION_STR}" $@ | grep -oP '^(?:filename|depends):\s+\S+')"
 
-	readarray -t filenames <<<"$(grep -oP '^filename:\s+\K.*' <<< "$INFO")"
+	readarray -t filenames <<<"$(grep -oP '^filename:\s+(?:\(builtin\))?\K.*' <<< "$INFO")"
 	module_paths+=("${filenames[@]}")
 
 	readarray -t depends <<<"$(sed -nE '/^depends:/{s/^depends:\s+//;s/,/\n/;p}' <<< "$INFO" | sort | uniq)"
