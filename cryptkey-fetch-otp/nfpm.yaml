@@ -12,7 +12,7 @@ priority: "extra"
 maintainer: "Richard Oliver <richard.oliver@raspberrypi.com>"
 
 depends: 
-  - busybox
+  - busybox | coreutils
   - xxd
   - raspi-utils-core
 
