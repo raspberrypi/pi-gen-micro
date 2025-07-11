@@ -124,6 +124,7 @@ dpkg_install busybox
 
 cd build/bin
 ln -s busybox sh
+ln -s busybox base64
 ln -s mawk awk
 echo '#!/bin/sh' > update-alternatives
 echo 'return 0' >> update-alternatives
