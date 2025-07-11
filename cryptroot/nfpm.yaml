@@ -13,7 +13,6 @@ maintainer: "Richard Oliver <richard.oliver@raspberrypi.com>"
 
 depends:
   - cryptsetup-bin
-  - cryptkey-fetch-otp
   - libgcc-s1
 
 contents:
