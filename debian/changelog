@@ -1,3 +1,15 @@
+pi-gen-micro (0.4.1) unstable; urgency=medium
+
+  * Non-maintainer upload
+
+  [ Tom Dewey ]
+  * deps: Install kpartx if using udev
+  * pi-gen-micro: builtin modules cannot be copied by rsync
+  * networking: Use MAC as DHCP client identifier
+  * cryptroot: Separate rootfs and cryptkey-fetch packages
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Thu, 17 Jul 2025 16:00:00 +0100
+
 pi-gen-micro (0.4.0) unstable; urgency=medium
 
   * Non-maintainer upload
