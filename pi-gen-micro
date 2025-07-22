@@ -226,6 +226,7 @@ if [ "${NETWORK}" = 1 ]
 then
   if [ "${UDEV}" = 1 ]
   then
+
     echo "Installing & Enabling networking"
     cp "${PREBUILTS_DIR}"/20-wired.network build/etc/systemd/network/20-wired.network
     mkdir -p build/etc/systemd/system
