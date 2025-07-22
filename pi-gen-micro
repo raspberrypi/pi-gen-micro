@@ -104,7 +104,16 @@ install_udeb_substitute() {
   rm "${PACKAGE_PATH}"
 
   PACKAGE_VERSION="$(grep -oP '^Version:\s*\K.*' "${EXTRACT_DIR}"/DEBIAN/control)"
-  sed --in-place "/^Provides:/s/${base_package},/${base_package} (= ${PACKAGE_VERSION}),/" "${EXTRACT_DIR}/DEBIAN/control"
+
+  # Check if Provides: line exists
+  if ! grep -q "^Provides:" "${EXTRACT_DIR}/DEBIAN/control"; then
+    # If not, add it before the first line
+    sed -i "1iProvides: ${base_package} (= ${PACKAGE_VERSION}), ${base_package}:arm64" "${EXTRACT_DIR}/DEBIAN/control"
+  else
+    # If it exists, modify it
+    sed --in-place "/^Provides:/s/${base_package},/${base_package} (= ${PACKAGE_VERSION}), ${base_package}:arm64,/" "${EXTRACT_DIR}/DEBIAN/control"
+  fi
+
   echo "Replaces: ${base_package} (= ${PACKAGE_VERSION})
 Conflicts: ${base_package} (= ${PACKAGE_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/control"
 
@@ -119,6 +128,15 @@ Conflicts: ${base_package} (= ${PACKAGE_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/con
 
 # Download, patch, install udeb substitute packages
 install_udeb_substitute libc6-udeb
+if [ -f "${CONFIGURATION_FOLDER}/udebs.list" ]; then
+    IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/udebs.list tr '\n' ', ')"
+
+    for package in "${array[@]}"
+    do
+      echo "Installing Udeb Substitute: ${package}"
+      install_udeb_substitute "${package}"
+    done
+fi
 
 dpkg_install busybox
 
@@ -203,10 +221,6 @@ do
    apt_install "${package}"
 done
 
-rm build/bin/dpkg-*
-rm build/bin/dpkg
-
-PATH="${CONFIGURATION_FOLDER}:${PATH}" "${CONFIGURATION_FOLDER}"/installer_scripts.list
 
 if [ "${NETWORK}" = 1 ]
 then
@@ -218,16 +232,37 @@ then
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/dbus-org.freedesktop.network1.service
     mkdir -p build/etc/systemd/system/multi-user.target.wants
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
+    ln -s /lib/systemd/system/systemd-resolved.service build/etc/systemd/system/multi-user.target.wants/systemd-resolved.service
+    echo "nameserver 8.8.8.8
+nameserver 8.8.4.4
+" > build/etc/resolv.conf
+    mkdir -p build/etc/ssl/certs/ 
+    
+    # ca-certificates are not installed into the correct directory by default
+    # Importing the required certificates from the Host machine
+    cp -r /etc/ssl/certs/* build/etc/ssl/certs/
+    cp /etc/ca-certificates.conf build/etc/ca-certificates.conf
+
     mkdir -p build/etc/systemd/system/sockets.target.wants
     ln -s /lib/systemd/system/systemd-networkd.socket build/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
     mkdir -p build/etc/systemd/system/sysinit.target.wants
     ln -s /lib/systemd/system/systemd-network-generator.service build/etc/systemd/system/sysinit.target.wants/systemd-network-generator.service
     mkdir -p build/etc/systemd/system/network-online.target.wants
     ln -s /lib/systemd/system/systemd-networkd-wait-online.service build/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service
+
+    # Add timesync service - necessary for using ca-certificates
+    cp "${PREBUILTS_DIR}"/sync_time.sh build/sbin
+    cp "${PREBUILTS_DIR}"/sync-network-time.service build/etc/systemd/system/sync-network-time.service
+    ln -s /etc/systemd/system/sync-network-time.service build/etc/systemd/system/multi-user.target.wants/sync-network-time.service
   else
     echo "--------------- ERROR - Network cannot be installed without UDEV Support. This component will not work! --------------------"
   fi
 fi
+
+rm build/bin/dpkg-*
+rm build/bin/dpkg
+
+PATH="${CONFIGURATION_FOLDER}:${PATH}" "${CONFIGURATION_FOLDER}"/installer_scripts.list
 
 # getty-static.service starts tty2-tty6 if dbus / logind are not available
 # Override this behaviour
@@ -266,6 +301,8 @@ then
   s/\(--keep-baud\)/--noclear --autologin root \1/' \
     build/etc/systemd/system/serial-getty@.service
 fi
+
+sudo sed -i 's:/bin/bash:/bin/sh:g' build/etc/passwd
 # Ensure compressed modules can be loaded (busybox implementation of modprobe
 # is insufficient)
 dpkg_unpack kmod
