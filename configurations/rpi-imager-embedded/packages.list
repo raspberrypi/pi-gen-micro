@@ -1,0 +1,8 @@
+coreutils
+libc-bin
+libfuse2
+fuse
+libfontconfig1
+rpi-imager-embedded
+openssl
+libstdc++6
