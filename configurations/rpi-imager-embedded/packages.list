@@ -5,4 +5,5 @@ fuse
 libfontconfig1
 rpi-imager-embedded
 openssl
+xkb-data-udeb
 libstdc++6
