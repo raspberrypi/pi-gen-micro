@@ -390,6 +390,11 @@ if [ -z "${UDEV}" ]
 then
   cp "${PREBUILTS_DIR}"/load_modules.sh build/usr/local/bin/load_modules
   cp "${PREBUILTS_DIR}"/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
+else
+  # Installed perl to help udev postinst, however don't need in final image
+  rm -rf build/usr/lib/aarch64-linux-gnu/perl-base
+  rm -rf build/usr/bin/perl
+  rm -rf build/usr/bin/perl5.36.0
 fi
 
 if [ "${SSH}" = 1 ]
@@ -400,12 +405,17 @@ then
   chmod 0600 build/root/.ssh/authorized_keys
   mkdir build/dev/pts
 fi
+if [ -f "${CONFIGURATION_FOLDER}"/post_creation.sh ]
+then
+  # Run post-creation script
+  "${CONFIGURATION_FOLDER}"/post_creation.sh
+fi
 
 # Package initramfs
 cd build
 find . -print0 | cpio --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
 cd ..
-zstd --no-progress --rm -15 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
+zstd --no-progress --ultra --long --rm -22 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
 
 echo "Making boot img"
 echo "Out directory = ${OUT_DIR}"
