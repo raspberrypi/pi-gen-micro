@@ -1,0 +1,1 @@
+rootwait console=serial0,115200 root=/dev/ram0 loglevel=8 fullscreen_logo_name=logo.tga fullscreen_logo=1 vt.global_cursor_default=0

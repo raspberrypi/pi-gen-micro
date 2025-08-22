@@ -6,6 +6,7 @@ set -e
 KERNEL_BIT_SIZE=64
 OUT_IMAGE_NAME="boot.img"
 OUT_2710_NAME="2710_bootfiles.bin"
+HAS_CUSTOM_KERNEL=0
 
 # Overwrite the defaults with that from the build.parameters file
 : "${CONFIGURATION_ROOT:=/var/lib/pi-gen-micro/configurations/}"
@@ -327,15 +328,29 @@ dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
 		--strip-components="$PATH_COMPONENTS" \
 		$RASPI_FIRMWARE_SUBDIR
 
-# Find kernel
-KERNEL_META=linux-image-rpi-v8
-KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
-apt_download "$KERNEL_PACKAGE"
-KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
-apt_download "${KERNEL_PACKAGE}"
+if [ "${HAS_CUSTOM_KERNEL}" = 1 ]
+then
+  # To use custom kernel, provide the following
+  # KERNEL_MODULES_DIR=/path/to/built/kernel/modules
+  # HAS_CUSTOM_KERNEL=1
+  # CUSTOM_KERNEL_VERSION_STR="" e.g. "6.12.40-v8+"
+  # CUSTOM_KERNEL_PATH=/path/to/your/Image.gz
+  # Will use default kernel for device trees, but will use custom kernel for modules and kernel.img
 
-KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
-dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
+  echo "Using custom kernel"
+  KERNEL_VERSION_STR="${CUSTOM_KERNEL_VERSION_STR}"
+  KPKG_EXTRACT="${KERNEL_MODULES_DIR}"
+else
+  # Find kernel
+  KERNEL_META=linux-image-rpi-v8
+  KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
+  apt_download "$KERNEL_PACKAGE"
+  KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
+  apt_download "${KERNEL_PACKAGE}"
+
+  KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
+  dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
+fi
 
 # Copy requested kernel modules (+deps) into image and generate module dependencies
 depmod --basedir "${KPKG_EXTRACT}" "${KERNEL_VERSION_STR}"
@@ -382,7 +397,25 @@ depmod --basedir "${ROOTFS_DIR}" "${KERNEL_VERSION_STR}"
 
 # Manually form-up the kernel and bootfs
 mkdir -p "${OUT_DIR}"/overlays
-mv "${KPKG_EXTRACT}"/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/zImage
+
+if [ "${HAS_CUSTOM_KERNEL}" = 1 ]
+then
+  # Assumes that provided kernel did not provide device trees etc.
+  KERNEL_META=linux-image-rpi-v8
+  KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
+  apt_download "$KERNEL_PACKAGE"
+  KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
+  apt_download "${KERNEL_PACKAGE}"
+
+  KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
+  dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
+
+  echo "Copying Custom Kernel"
+  cp ${CUSTOM_KERNEL_PATH} ${OUT_DIR}/zImage
+else
+  mv "${KPKG_EXTRACT}"/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/zImage
+fi
+
 mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
 mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/overlay_map.dtb "${OUT_DIR}"/overlays/
 mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/dwc2.dtbo "${OUT_DIR}"/overlays/
@@ -494,6 +527,20 @@ else
   rm -rf build/usr/bin/perl5.36.0
 fi
 
+if [ "$USES_CUSTOM_LOGO" = 1 ]
+then
+  ## Copy in our splashscreen files:
+  mkdir -p build/lib/firmware
+  cp "${CONFIGURATION_FOLDER}"/*.tga build/lib/firmware/
+fi
+
+if [ -f "${CONFIGURATION_FOLDER}/cmdline.txt" ]
+then
+  # Users can specify custom cmdline.txt's in the configuration directory
+  # see rpi-imager-embedded for example
+  cp "${CONFIGURATION_FOLDER}/cmdline.txt" "${OUT_DIR}"/cmdline.txt
+fi
+
 if [ "${SSH}" = 1 ]
 then
   echo "Installing SSH!"
@@ -510,6 +557,19 @@ fi
 
 # Package initramfs
 cd build
+
+# Delete unecessary packages
+if [ -f "${CONFIGURATION_FOLDER}/delete.list" ]; then
+    IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/delete.list tr '\n' ', ')"
+    for package in "${array[@]}"
+    do
+      echo "Deleting: ${package}"
+      rm -rf $(find . -name *${package}*)
+    done
+fi
+
+echo "Compressing & creating boot image"
+
 find . -print0 | cpio --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
 cd ..
 zstd --no-progress --ultra --long --rm -22 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
