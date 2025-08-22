@@ -26,6 +26,7 @@ echo "${TARGET_DEVICE}"
 rm -rf build
 rm -f initramfs
 rm -rf "${OUT_DIR}"
+rm -rf raspi-firmware
 mkdir -p "${OUT_DIR}"
 
 mkdir -p build/usr/bin
@@ -226,9 +227,17 @@ if [ "${NETWORK}" = 1 ]
 then
   if [ "${UDEV}" = 1 ]
   then
-
     echo "Installing & Enabling networking"
+    apt_install systemd-timesyncd
     cp "${PREBUILTS_DIR}"/20-wired.network build/etc/systemd/network/20-wired.network
+    mkdir -p build/var/lib/systemd/timesync/
+    ln -s /lib/systemd/system/systemd-timesyncd.service build/etc/systemd/system/dbus-org.freedesktop.timesync1.service
+    ln -s /lib/systemd/system/systemd-timesyncd.service build/etc/systemd/system/sysinit.target.wants/systemd-timesyncd.service
+    cp "${PREBUILTS_DIR}"/timesyncd.conf build/etc/systemd/timesyncd.conf
+    sed -i "s/After=systemd-sysusers.service/After=systemd-sysusers.service, network-online.target/" ./build/usr/lib/systemd/system/systemd-timesyncd.service
+    sed -i "s/Wants=time-set.target/Wants=network-online.target/" build/usr/lib/systemd/system/systemd-timesyncd.service
+    sed -i "s/Before=time-set.target sysinit.target shutdown.target//" build/usr/lib/systemd/system/systemd-timesyncd.service
+
     mkdir -p build/etc/systemd/system
     ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/dbus-org.freedesktop.network1.service
     mkdir -p build/etc/systemd/system/multi-user.target.wants
@@ -251,10 +260,6 @@ nameserver 8.8.4.4
     mkdir -p build/etc/systemd/system/network-online.target.wants
     ln -s /lib/systemd/system/systemd-networkd-wait-online.service build/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service
 
-    # Add timesync service - necessary for using ca-certificates
-    cp "${PREBUILTS_DIR}"/sync_time.sh build/sbin
-    cp "${PREBUILTS_DIR}"/sync-network-time.service build/etc/systemd/system/sync-network-time.service
-    ln -s /etc/systemd/system/sync-network-time.service build/etc/systemd/system/multi-user.target.wants/sync-network-time.service
   else
     echo "--------------- ERROR - Network cannot be installed without UDEV Support. This component will not work! --------------------"
   fi
@@ -312,12 +317,13 @@ apt-get --fix-broken install
 
 # Boot firmare
 apt_download raspi-firmware
+mkdir raspi-firmware
 RASPI_FIRMWARE_SUBDIR="./usr/lib/raspi-firmware/"
 PATH_COMPONENTS="$(echo $RASPI_FIRMWARE_SUBDIR | grep -o "/" | wc -l)"
 dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
 	tar \
 		--extract \
-		--directory="${OUT_DIR}/" \
+		--directory="raspi-firmware" \
 		--strip-components="$PATH_COMPONENTS" \
 		$RASPI_FIRMWARE_SUBDIR
 
@@ -377,13 +383,104 @@ depmod --basedir "${ROOTFS_DIR}" "${KERNEL_VERSION_STR}"
 # Manually form-up the kernel and bootfs
 mkdir -p "${OUT_DIR}"/overlays
 mv "${KPKG_EXTRACT}"/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/zImage
-mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/*.dtb "${OUT_DIR}"/
-mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
 mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
+mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/overlay_map.dtb "${OUT_DIR}"/overlays/
+mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/dwc2.dtbo "${OUT_DIR}"/overlays/
+mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt.dtbo "${OUT_DIR}"/overlays/
+mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi.dtbo "${OUT_DIR}"/overlays/
+
 mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
 
 cp "${PREBUILTS_DIR}"/config.txt "${OUT_DIR}"/config.txt
 cp "${PREBUILTS_DIR}"/cmdline.txt "${OUT_DIR}"/cmdline.txt
+
+if [ "$#" -eq 1 ]; then
+  echo "No target devices specified, building for all devices"
+  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/*.dtb "${OUT_DIR}"/
+  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
+else
+  IFS=',' read -ra target_devices <<< "$2"
+  for arg in "${target_devices[@]}";
+  do 
+    echo "Installing files for ${arg}"
+    if [ "${arg}" == "cm5" ]; then
+      # cm5 Files
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-cm5-cm4io.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-cm5-cm5io.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-cm5l-cm4io.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-cm5l-cm5io.dtb "${OUT_DIR}"/
+
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/bcm2712d0.dtbo "${OUT_DIR}"/overlays/
+    fi
+    if [ "${arg}" == "500" ]; then
+      # 500 Files
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-500.dtb "${OUT_DIR}"/
+
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/bcm2712d0.dtbo "${OUT_DIR}"/overlays/
+    fi
+    if [ "${arg}" == "pi5" ]; then
+      # pi5 Files
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712d0-rpi-5-b.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-d-rpi-5-b.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-5-b.dtb "${OUT_DIR}"/
+
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi-pi5.dtbo "${OUT_DIR}"/overlays/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/bcm2712d0.dtbo "${OUT_DIR}"/overlays/
+    fi
+    if [ "${arg}" == "cm4" ]; then
+      # cm4 Files
+      cp raspi-firmware/start4.elf "${OUT_DIR}"/
+      cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-cm4.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-cm4s.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-cm4-io.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi4.dtbo "${OUT_DIR}"/overlays/
+    fi
+    if [ "${arg}" == "400" ]; then
+      # 400 Files
+      cp raspi-firmware/start4.elf "${OUT_DIR}"/
+      cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-400.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi4.dtbo "${OUT_DIR}"/overlays/
+    fi
+    if [ "${arg}" == "pi4" ]; then
+      # pi4 Files
+      cp raspi-firmware/start4*.elf "${OUT_DIR}"/
+      cp raspi-firmware/fixup4*.dat "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-4-b.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi4.dtbo "${OUT_DIR}"/overlays/
+    fi
+    if [ "${arg}" == "pi3" ]; then
+      # pi3 Files
+      cp raspi-firmware/* "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2710-rpi-3-b-plus.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2710-rpi-3-b.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-3-a-plus.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-3-b.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-3-b-plus.dtb "${OUT_DIR}"/
+    fi
+    if [ "${arg}" == "cm3" ]; then
+      # cm3 Files
+      cp raspi-firmware/* "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2710-rpi-cm3.dtb "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-cm3-io3.dtb "${OUT_DIR}"/
+    fi
+    
+    if [ "${arg}" == "02W" ]; then
+      # 02W Files
+      cp raspi-firmware/* "${OUT_DIR}"/
+      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-zero-2-w.dtb "${OUT_DIR}"/
+    fi
+  done
+fi
 
 # Custom (no udev requirement) systemd-modules-load.service
 if [ -z "${UDEV}" ]
