@@ -564,6 +564,16 @@ if [ -f "${CONFIGURATION_FOLDER}/delete.list" ]; then
     for package in "${array[@]}"
     do
       echo "Deleting: ${package}"
+      rm -rf ${package}
+    done
+fi
+
+# Delete unecessary packages
+if [ -f "${CONFIGURATION_FOLDER}/generic_delete.list" ]; then
+    IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/generic_delete.list tr '\n' ', ')"
+    for package in "${array[@]}"
+    do
+      echo "Deleting: ${package}"
       rm -rf $(find . -name *${package}*)
     done
 fi
