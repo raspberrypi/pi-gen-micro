@@ -24,7 +24,12 @@ source "${CONFIGURATION_FOLDER}"/components.parameters
 echo "${CONFIGURATION_FOLDER}"
 echo "${TARGET_DEVICE}"
 
-rm -rf build
+# Ensure sbin is on PATH for utilities like ldconfig
+if [[ ":$PATH:" != *":/usr/sbin:"* ]]; then
+  PATH="${PATH:+"$PATH:"}/usr/sbin"
+fi
+
+rm -rf build dpkg_admin
 rm -f initramfs
 rm -rf "${OUT_DIR}"
 rm -rf raspi-firmware
@@ -40,8 +45,13 @@ export ROOTFS_DIR=$PWD/build
 export DPKG_ROOT=$ROOTFS_DIR
 export TOP="${PWD}"
 
+mkdir -p $ROOTFS_DIR/var/lib/dpkg
+touch $ROOTFS_DIR/var/lib/dpkg/lock-frontend
+mkdir -p $ROOTFS_DIR/var/log
+touch $ROOTFS_DIR/var/log/dpkg.log
+
 # TODO: Parse from apt.cfg
-mkdir -p apt/cache apt/log apt/state
+mkdir -p apt_cache/archives/partial apt_lists/partial
 
 rsync \
   --archive \
@@ -60,25 +70,32 @@ export APT_CONFIG=$PWD/apt.cfg
 DPKG_EXTRA_ARGS="$(sed '/^#/d;s/^/--/' "${CONFIGURATION_FOLDER}"/dpkg_extra_args | xargs)"
 
 apt_download() {
-  apt-get install --download-only "$@" 2>/dev/null
+  fakeroot apt-get install --download-only "$@" 2>/dev/null
 }
 
-# Can't use install until it's possible to chroot
 apt_install() {
-  apt-get install "$@" --no-install-recommends 2>/dev/null
+  fakeroot apt-get install "$@" --no-install-recommends 2>/dev/null
 }
 
 get_package_path() {
-  # Not fully URL-encoded (no spec found)
-  PKG_VERSION=$(apt-cache policy "$1" | grep -oP 'Candidate: \K.*' | sed 's/:/%3a/')
-  find apt/cache/archives/ -name "${1}_${PKG_VERSION}*"
+  local pkg_name="$1"
+  echo -n "apt_cache/archives/"
+  apt-get download "$pkg_name" --print-uris | awk '{print $2}'
 }
 
 dpkg_unpack() {
   apt_download "$1"
   set -o noglob
   # shellcheck disable=SC2086
-  dpkg ${DPKG_EXTRA_ARGS} --no-triggers --unpack "$(get_package_path $1)"
+  fakeroot \
+    dpkg \
+      --instdir="$ROOTFS_DIR" \
+      --admindir="$PWD/dpkg_admin" \
+      --log="$PWD/dpkg_admin/dpkg.log" \
+      --force-script-chrootless \
+      ${DPKG_EXTRA_ARGS} \
+      --no-triggers \
+      --unpack "$(get_package_path $1)"
   set +o noglob
 }
 
@@ -86,7 +103,14 @@ dpkg_install() {
   apt_download "$1"
   set -o noglob
   # shellcheck disable=SC2086
-  dpkg ${DPKG_EXTRA_ARGS} --install "$(get_package_path $1)"
+  fakeroot \
+    dpkg \
+      --instdir="$ROOTFS_DIR" \
+      --admindir="$PWD/dpkg_admin" \
+      --log="$PWD/dpkg_admin/dpkg.log" \
+      --force-script-chrootless \
+      ${DPKG_EXTRA_ARGS} \
+      --install "$(get_package_path $1)"
   set +o noglob
 }
 
@@ -119,12 +143,19 @@ install_udeb_substitute() {
   echo "Replaces: ${base_package} (= ${PACKAGE_VERSION})
 Conflicts: ${base_package} (= ${PACKAGE_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/control"
 
-  dpkg-deb --build "${EXTRACT_DIR}" "${PACKAGE_PATH}"
+  dpkg-deb --root-owner-group --build "${EXTRACT_DIR}" "${PACKAGE_PATH}"
   rm -rf "${EXTRACT_DIR}"
 
   set -o noglob
   # shellcheck disable=SC2086
-  dpkg ${DPKG_EXTRA_ARGS} --install "${PACKAGE_PATH}"
+  fakeroot \
+    dpkg \
+      --instdir="$ROOTFS_DIR" \
+      --admindir="$PWD/dpkg_admin" \
+      --log="$PWD/dpkg_admin/dpkg.log" \
+      --force-script-chrootless \
+      ${DPKG_EXTRA_ARGS} \
+      --install "${PACKAGE_PATH}"
   set +o noglob
 }
 
@@ -162,12 +193,18 @@ dpkg_install mawk
 # Just unpack base-files for now (can't postinst without base-passwd)
 dpkg_unpack base-files
 
-chroot build /bin/busybox --install -s
+cd build/bin
+for util in $(./busybox --list); do
+  # || true prevents failure for already installed utils (like awk)
+  ln -s /bin/busybox "$util" || true
+done
+cd - >/dev/null
 
 # Need to properly install base-passwd before base-files can be completed
-apt_download libpcre2-8-0 libselinux1 libdebconfclient0 base-passwd
+apt_download libpcre2-8-0 libselinux1 libdebconfclient0 debconf base-passwd
 dpkg_install libpcre2-8-0
 dpkg_install libselinux1
+dpkg_install debconf
 dpkg_install libdebconfclient0
 dpkg_install base-passwd
 
@@ -178,9 +215,6 @@ dpkg_unpack util-linux-extra
 rm -rf build/etc/init.d
 apt-get --fix-broken install
 
-# Tiny debconf for libpam0g (systemd dep)
-apt_install cdebconf-udeb cdebconf-text-udeb
-sed --in-place 's/newt/text/g' build/etc/cdebconf.conf
 if [ "${SSH}" = 1 ]
 then
   echo "Installing SSH!"
@@ -232,8 +266,6 @@ then
     apt_install systemd-timesyncd
     cp "${PREBUILTS_DIR}"/20-wired.network build/etc/systemd/network/20-wired.network
     mkdir -p build/var/lib/systemd/timesync/
-    ln -s /lib/systemd/system/systemd-timesyncd.service build/etc/systemd/system/dbus-org.freedesktop.timesync1.service
-    ln -s /lib/systemd/system/systemd-timesyncd.service build/etc/systemd/system/sysinit.target.wants/systemd-timesyncd.service
     cp "${PREBUILTS_DIR}"/timesyncd.conf build/etc/systemd/timesyncd.conf
     sed -i "s/After=systemd-sysusers.service/After=systemd-sysusers.service, network-online.target/" ./build/usr/lib/systemd/system/systemd-timesyncd.service
     sed -i "s/Wants=time-set.target/Wants=network-online.target/" build/usr/lib/systemd/system/systemd-timesyncd.service
@@ -309,12 +341,14 @@ then
     build/etc/systemd/system/serial-getty@.service
 fi
 
-sudo sed -i 's:/bin/bash:/bin/sh:g' build/etc/passwd
+sed -i 's:/bin/bash:/bin/sh:g' build/etc/passwd
 # Ensure compressed modules can be loaded (busybox implementation of modprobe
 # is insufficient)
 dpkg_unpack kmod
 rm -rf build/etc/init.d
 apt-get --fix-broken install
+
+apt_install xz-utils
 
 # Boot firmare
 apt_download raspi-firmware
@@ -350,6 +384,10 @@ else
 
   KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
   dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
+  # Depmod (see below) hard-codes /lib path, ensure the symlink exists
+  if [ ! -e "${KPKG_EXTRACT}/lib" ]; then
+    ln -s "${KPKG_EXTRACT}/usr/lib" "${KPKG_EXTRACT}/lib"
+  fi
 fi
 
 # Copy requested kernel modules (+deps) into image and generate module dependencies
@@ -377,9 +415,9 @@ get_deps() {
 get_deps $(sed '/^#/d' "${CONFIGURATION_FOLDER}"/kernel_modules.list | sort | uniq | xargs)
 cd - >/dev/null
 printf "
-${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.order
-${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.builtin
-${KPKG_EXTRACT}/./lib/modules/${KERNEL_VERSION_STR}/modules.builtin.modinfo
+${KPKG_EXTRACT}/./usr/lib/modules/${KERNEL_VERSION_STR}/modules.order
+${KPKG_EXTRACT}/./usr/lib/modules/${KERNEL_VERSION_STR}/modules.builtin
+${KPKG_EXTRACT}/./usr/lib/modules/${KERNEL_VERSION_STR}/modules.builtin.modinfo
 %s
 " "${module_paths[@]}" | sort | uniq | \
 rsync \
@@ -580,7 +618,7 @@ fi
 
 echo "Compressing & creating boot image"
 
-find . -print0 | cpio --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
+find . -print0 | cpio --owner=0:0 --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
 cd ..
 zstd --no-progress --ultra --long --rm -22 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
 
@@ -590,8 +628,6 @@ mkdir -p "${OUT_DIR}"
 rpi-make-boot-image -d "${OUT_DIR}"/ -o "${OUT_IMAGE_NAME}" -a "${KERNEL_BIT_SIZE}"
 
 echo "Making 2710 bootfiles"
-mkdir 2710
-mount --bind "${OUT_DIR}" 2710
-tar --create --file "${OUT_2710_NAME}" 2710
-umount 2710
-rmdir 2710
+ln -s "${OUT_DIR}" 2710
+tar --create --dereference --file "${OUT_2710_NAME}" 2710
+unlink 2710
