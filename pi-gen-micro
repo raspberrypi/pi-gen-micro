@@ -467,6 +467,7 @@ cp "${PREBUILTS_DIR}"/cmdline.txt "${OUT_DIR}"/cmdline.txt
 
 if [ "$#" -eq 1 ]; then
   echo "No target devices specified, building for all devices"
+  rsync --archive raspi-firmware/ "${OUT_DIR}"/
   mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/*.dtb "${OUT_DIR}"/
   mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
 else
