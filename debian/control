@@ -9,7 +9,7 @@ Homepage: https://www.raspberrypi.com/software
 Package: pi-gen-micro
 Architecture: arm64
 Pre-Depends: dpkg (>= 1.16.1)
-Depends: ${misc:Depends}, ${shlibs:Depends}, rpi-make-boot-image, sed (>= 4.9), bash (>= 5.2), debian-archive-keyring, raspberrypi-archive-keyring, fakeroot
+Depends: ${misc:Depends}, ${shlibs:Depends}, rpi-make-boot-image, sed (>= 4.9), bash (>= 5.2), debian-archive-keyring, raspberrypi-archive-keyring, fakeroot, rpi-modcopy
 Recommends: curl, dctrl-tools, coreutils (>= 9.1), gzip (>= 1.12), zstd (>= 1.5.4)
 Description: Tool to create cut-down Debian-based OS-images for Raspberry Pi Devices
  pi-gen-micro is a lightweight tool for creating minimal Debian-based
