@@ -391,47 +391,15 @@ else
 fi
 
 # Copy requested kernel modules (+deps) into image and generate module dependencies
+#
+# Generate modules.dep.bin metadata for uninstalled pacakge
 depmod --basedir "${KPKG_EXTRACT}" "${KERNEL_VERSION_STR}"
-cd "${KPKG_EXTRACT}"
-module_paths=()
-get_deps() {
-	if [ "$#" -eq 0 ]; then
-		return
-	fi
-
-	local INFO
-        # shellcheck disable=SC2068
-	INFO="$(modinfo --basedir . -k "${KERNEL_VERSION_STR}" $@ | grep -oP '^(?:filename|depends):\s+\S+')"
-
-	readarray -t filenames <<<"$(grep -oP '^filename:\s+(?:\(builtin\))?\K.*' <<< "$INFO")"
-	module_paths+=("${filenames[@]}")
-
-	readarray -t depends <<<"$(sed -nE '/^depends:/{s/^depends:\s+//;s/,/\n/;p}' <<< "$INFO" | sort | uniq)"
-        # shellcheck disable=SC2068
-	get_deps ${depends[@]}
-}
-
-# shellcheck disable=SC2046
-get_deps $(sed '/^#/d' "${CONFIGURATION_FOLDER}"/kernel_modules.list | sort | uniq | xargs)
-cd - >/dev/null
-printf "
-${KPKG_EXTRACT}/./usr/lib/modules/${KERNEL_VERSION_STR}/modules.order
-${KPKG_EXTRACT}/./usr/lib/modules/${KERNEL_VERSION_STR}/modules.builtin
-${KPKG_EXTRACT}/./usr/lib/modules/${KERNEL_VERSION_STR}/modules.builtin.modinfo
-%s
-" "${module_paths[@]}" | sort | uniq | \
-rsync \
-	--perms \
-	--times \
-	--group \
-	--owner \
-	--acls \
-	--xattrs \
-	--keep-dirlinks \
-	--files-from=- \
-	/ \
-	"${ROOTFS_DIR}/"
-depmod --basedir "${ROOTFS_DIR}" "${KERNEL_VERSION_STR}"
+# Copy modules
+rpi-modcopy \
+  --kernel-version="${KERNEL_VERSION_STR}" \
+  --module-file="${CONFIGURATION_FOLDER}"/kernel_modules.list \
+  "${KPKG_EXTRACT}" \
+  "${ROOTFS_DIR}"
 
 # Manually form-up the kernel and bootfs
 mkdir -p "${OUT_DIR}"/overlays
