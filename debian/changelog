@@ -1,3 +1,22 @@
+pi-gen-micro (0.5.0) trixie; urgency=medium
+
+  [ Ben Benson ]
+  * HTTPS Working in pi-gen-micro images
+  * Added HTTPS support to images built using pi-gen-micro
+  * Added configuration to create rpi-embedded-imager
+  * rpi-imager-embedded changes
+  * Added post configuration script Tidied up rpi-embedded-imager profile
+  * Added build options for different devices
+  * Custom Kernel Support, Changes to rpi-embedded-imager
+  * Added more specificality to deleting
+
+  [ Richard Oliver ]
+  * Support Debian Trixie & no-root operation
+  * Copy raspi-firmware contents for generic build
+  * Use rpi-modcopy for kernel modules
+
+ -- Richard Oliver <richard.oliver@raspberrypi.com>  Mon, 26 Jan 2026 13:40:31 +0000
+
 pi-gen-micro (0.4.1) unstable; urgency=medium
 
   * Non-maintainer upload
