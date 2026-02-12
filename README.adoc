@@ -8,9 +8,9 @@ Why? Because this means you get the latest hardware support and updates in line 
 == Installing
 
 === Build the package
-Use the standard Debian `devscripts` package:
+Requires standard Debian developer packages:
 ```
-sudo apt install -y devscripts
+sudo apt install -y devscripts debhelper build-essential
 debuild -uc -us
 ```
 
