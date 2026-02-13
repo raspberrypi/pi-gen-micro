@@ -1,3 +1,16 @@
+pi-gen-micro (0.5.1) trixie; urgency=medium
+
+  [ Tom Dewey ]
+  * cryptroot: Add rpifwcrypto key fetcher with OTP fallback
+  * cryptroot: Support configurable block device and multi-device types
+  * cryptroot: Bump cryptroot-package to 1.3.0
+  * cryptkey-fetch-otp: Accept unused device argument for interface compatibility
+  * Add new cryptkey-rpifwcrypto package (1.0.0)
+  * fastboot: Remove cryptsetup-bin, gpiod, and kpartx from packages
+  * imager-embedded: Update to 2.0.0
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Fri, 13 Feb 2026 16:00:00 +0000
+
 pi-gen-micro (0.5.0) trixie; urgency=medium
 
   [ Ben Benson ]

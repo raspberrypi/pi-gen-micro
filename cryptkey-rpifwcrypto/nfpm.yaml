@@ -1,0 +1,30 @@
+# nfpm configuration file for cryptkey-rpifwcrypto
+#
+# check https://nfpm.goreleaser.com/configuration for detailed usage
+#
+name: "cryptkey-rpifwcrypto"
+arch: "arm64"
+platform: "linux"
+version: "1.0.0"
+section: "default"
+priority: "extra"
+
+maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
+
+description: "Cryptographic key fetcher using rpifwcrypto HMAC of MMC CID"
+
+depends: 
+  - busybox | coreutils
+  - xxd
+  - rpifwcrypto
+
+contents:
+- src: cryptkey-rpifwcrypto
+  dst: /usr/bin/cryptkey-rpifwcrypto
+  file_info:
+    mode: 0755
+
+deb:
+  compression: zstd
+
+
