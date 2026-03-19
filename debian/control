@@ -2,8 +2,8 @@ Source: pi-gen-micro
 Section: embedded
 Priority: optional
 Maintainer: Richard Oliver <richard.oliver@raspberrypi.com>
-Build-Depends: debhelper (>= 13)
-Standards-Version: 3.9.5
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.2
 Homepage: https://www.raspberrypi.com/software
 
 Package: pi-gen-micro
