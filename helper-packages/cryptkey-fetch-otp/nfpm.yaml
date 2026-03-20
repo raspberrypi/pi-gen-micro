@@ -11,6 +11,13 @@ priority: "extra"
 
 maintainer: "Richard Oliver <richard.oliver@raspberrypi.com>"
 
+description: |
+  Reads a private key from the Raspberry Pi's OTP (one-time programmable)
+  memory via vcmailbox. Used by cryptroot as a fallback key source when
+  cryptkey-rpifwcrypto is unavailable. Supports BCM2711 and BCM2712 chips.
+  Note: OTP rows are visible to any user in the 'video' group, so this is
+  only suitable for key storage when signed boot is enabled.
+
 depends: 
   - busybox | coreutils
   - xxd

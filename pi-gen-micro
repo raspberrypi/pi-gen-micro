@@ -11,15 +11,142 @@ HAS_CUSTOM_KERNEL=0
 # Overwrite the defaults with that from the build.parameters file
 : "${CONFIGURATION_ROOT:=/var/lib/pi-gen-micro/configurations/}"
 
-: "${APT_DPKG_CFG:=/var/lib/pi-gen-micro/cfg}"
+: "${APT_DPKG_CFG:=/var/lib/pi-gen-micro/internal/apt}"
 
-: "${PREBUILTS_DIR:=/var/lib/pi-gen-micro/prebuilts}"
+: "${PREBUILTS_DIR:=/var/lib/pi-gen-micro/internal/prebuilts}"
+
+: "${HELPER_PACKAGES_DIR:=/var/lib/pi-gen-micro/helper-packages}"
+
+: "${LIB_DIR:=/var/lib/pi-gen-micro/internal/lib}"
+
+# ---------------------------------------------------------------------------
+# CLI: listing and usage
+# ---------------------------------------------------------------------------
+
+list_configurations() {
+    find "${CONFIGURATION_ROOT}" -mindepth 1 -maxdepth 1 -type d -printf '%P\n' 2>/dev/null | sort | while read -r name; do
+        desc=""
+        if [ -f "${CONFIGURATION_ROOT}${name}/description" ]; then
+            desc="$(cat "${CONFIGURATION_ROOT}${name}/description")"
+        fi
+        printf "  %-25s %s\n" "$name" "$desc"
+    done
+}
+
+list_helper_packages() {
+    find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name nfpm.yaml -printf '%h\n' 2>/dev/null | sort | while read -r dir; do
+        name="$(basename "$dir")"
+        version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$dir/nfpm.yaml")"
+        pkg_name="$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$dir/nfpm.yaml")"
+        desc="$(awk '
+            /^description:/ { reading=1; next }
+            reading && /^[^ ]/ { exit }
+            reading { gsub(/^ +/, ""); buf = buf (buf ? " " : "") $0 }
+            END {
+                if (match(buf, /\. |\.$/))
+                    print substr(buf, 1, RSTART)
+                else
+                    print buf
+            }
+        ' "$dir/nfpm.yaml")"
+        printf "  %-30s %s  (%s/)\n" "$pkg_name" "$version" "$name"
+        if [ -n "$desc" ]; then
+            printf "    %s\n" "$desc"
+        fi
+    done
+}
+
+usage() {
+    cat <<EOF
+Usage: pi-gen-micro <configuration> [target_devices]
+       pi-gen-micro --list-configurations
+       pi-gen-micro --list-packages
+
+Build a minimal Raspberry Pi OS image from a named configuration.
+
+Arguments:
+  configuration    Name of the configuration to build (required)
+  target_devices   Comma-separated list of target devices (optional)
+                   If omitted, builds for all supported devices.
+                   Supported: pi3, cm3, pi4, 400, cm4, pi5, 500, cm5, 02W
+
+Options:
+  -h, --help             Show this help message
+  --list-configurations  List available configurations with descriptions
+  --list-packages        List available helper packages with descriptions
+
+Available configurations:
+$(list_configurations)
+
+Each configuration directory contains:
+  build.parameters       Build-time settings (kernel bit size, custom kernel, etc.)
+  components.parameters  Feature flags: SYSTEMD, SSH, UDEV, NETWORK, AUTOLOGIN
+  packages.list          Additional packages to install into the image
+  kernel_modules.list    Kernel modules to include in the image
+  installer_scripts.list Script to run for post-install setup (executed, not sourced)
+  dpkg_extra_args        Extra dpkg path-exclude/path-include rules
+
+Optional files:
+  cmdline.txt            Custom kernel command line (overrides default)
+  post_creation.sh       Script run after image assembly
+  udebs.list             Additional udeb substitute packages to install
+  delete.list            Paths to delete from the final image
+  generic_delete.list    Filename patterns to delete from the final image
+
+Environment variables:
+  CONFIGURATION_ROOT     Path to configurations directory
+                         (default: /var/lib/pi-gen-micro/configurations/)
+  APT_DPKG_CFG           Path to apt/dpkg config directory
+                         (default: /var/lib/pi-gen-micro/internal/apt)
+  PREBUILTS_DIR          Path to prebuilt files directory
+                         (default: /var/lib/pi-gen-micro/internal/prebuilts)
+
+Output is written to \$PWD/out_image/. Run from a temporary directory:
+  pushd \$(mktemp -d) && sudo pi-gen-micro fastboot
+EOF
+    exit 1
+}
+
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    usage
+fi
+
+if [ "$1" = "--list-configurations" ]; then
+    echo "Configurations (from ${CONFIGURATION_ROOT}):"
+    echo
+    list_configurations
+    exit 0
+fi
+
+if [ "$1" = "--list-packages" ]; then
+    echo "Helper packages (from ${HELPER_PACKAGES_DIR}):"
+    echo
+    list_helper_packages
+    exit 0
+fi
+
+if [ -z "$1" ]; then
+    echo "Error: No configuration specified." >&2
+    echo >&2
+    usage
+fi
 
 CONFIGURATION_FOLDER="${CONFIGURATION_ROOT}"$1
+
+if [ ! -d "${CONFIGURATION_FOLDER}" ]; then
+    echo "Error: Configuration '$1' not found at ${CONFIGURATION_FOLDER}" >&2
+    echo >&2
+    echo "Available configurations:" >&2
+    list_configurations >&2
+    exit 1
+fi
 
 export OUT_DIR=$PWD/out_image
 source "${CONFIGURATION_FOLDER}"/build.parameters
 source "${CONFIGURATION_FOLDER}"/components.parameters
+
+# Default to systemd unless explicitly disabled
+: "${SYSTEMD:=1}"
 
 echo "${CONFIGURATION_FOLDER}"
 echo "${TARGET_DEVICE}"
@@ -29,574 +156,393 @@ if [[ ":$PATH:" != *":/usr/sbin:"* ]]; then
   PATH="${PATH:+"$PATH:"}/usr/sbin"
 fi
 
-rm -rf build dpkg_admin
-rm -f initramfs
-rm -rf "${OUT_DIR}"
-rm -rf raspi-firmware
-mkdir -p "${OUT_DIR}"
+# ---------------------------------------------------------------------------
+# Source helper libraries
+# ---------------------------------------------------------------------------
 
-mkdir -p build/usr/bin
-mkdir -p build/usr/lib
-cd build
-ln -s usr/bin bin
-ln -s usr/lib lib
-cd ..
-export ROOTFS_DIR=$PWD/build
-export DPKG_ROOT=$ROOTFS_DIR
-export TOP="${PWD}"
+source "${LIB_DIR}"/dpkg.sh
+source "${LIB_DIR}"/devices.sh
 
-mkdir -p $ROOTFS_DIR/var/lib/dpkg
-touch $ROOTFS_DIR/var/lib/dpkg/lock-frontend
-mkdir -p $ROOTFS_DIR/var/log
-touch $ROOTFS_DIR/var/log/dpkg.log
+if [ "${SYSTEMD}" != 0 ]; then
+  source "${LIB_DIR}"/init-systemd.sh
+else
+  source "${LIB_DIR}"/init-busybox.sh
+fi
 
-# TODO: Parse from apt.cfg
-mkdir -p apt_cache/archives/partial apt_lists/partial
+# The init libraries provide these functions with init-specific implementations:
+#   install_init_packages    - install init system (systemd-sysv or busybox /init link)
+#   configure_init_services  - configure console/getty (systemd units or /etc/inittab)
+#   configure_init_modules   - set up module loading (systemd service or rcS invocation)
+#   install_networking       - configure networking (systemd-networkd or udhcpc)
+#   configure_init_ssh       - SSH service startup (systemd unit or services.d script)
 
-rsync \
-  --archive \
-  "$APT_DPKG_CFG" \
-  ./
+# ---------------------------------------------------------------------------
+# Phase 1: Prepare build environment
+# ---------------------------------------------------------------------------
 
-# Relies on GNU sed extension (/dev/stdin file for 'r' command)
-sed '/^#/d;s/^/    "--/;s/$/";/' "$CONFIGURATION_FOLDER"/dpkg_extra_args 2>/dev/null | \
-sed "
-s%PWD%${PWD}%
-s%REALROOTREL%$(realpath -s --relative-to="$PWD" /)/%
-/DPKG_EXTRA_ARGS/{r /dev/stdin
-d}" cfg/apt.cfg > apt.cfg
+prepare_build_env() {
+  rm -rf build dpkg_admin
+  rm -f initramfs
+  rm -rf "${OUT_DIR}"
+  rm -rf raspi-firmware
+  mkdir -p "${OUT_DIR}"
 
-export APT_CONFIG=$PWD/apt.cfg
-DPKG_EXTRA_ARGS="$(sed '/^#/d;s/^/--/' "${CONFIGURATION_FOLDER}"/dpkg_extra_args | xargs)"
+  mkdir -p build/usr/bin
+  mkdir -p build/usr/lib
+  cd build
+  ln -s usr/bin bin
+  ln -s usr/lib lib
+  cd ..
+  export ROOTFS_DIR=$PWD/build
+  export DPKG_ROOT=$ROOTFS_DIR
+  export TOP="${PWD}"
 
-apt_download() {
-  fakeroot apt-get install --download-only "$@" 2>/dev/null
-}
+  mkdir -p $ROOTFS_DIR/var/lib/dpkg
+  touch $ROOTFS_DIR/var/lib/dpkg/lock-frontend
+  mkdir -p $ROOTFS_DIR/var/log
+  touch $ROOTFS_DIR/var/log/dpkg.log
 
-apt_install() {
-  fakeroot apt-get install "$@" --no-install-recommends 2>/dev/null
-}
+  # TODO: Parse from apt.cfg
+  mkdir -p apt_cache/archives/partial apt_lists/partial
 
-get_package_path() {
-  local pkg_name="$1"
-  echo -n "apt_cache/archives/"
-  apt-get download "$pkg_name" --print-uris | awk '{print $2}'
-}
+  rsync \
+    --archive \
+    "$APT_DPKG_CFG" \
+    ./
 
-dpkg_unpack() {
-  apt_download "$1"
-  set -o noglob
-  # shellcheck disable=SC2086
-  fakeroot \
-    dpkg \
-      --instdir="$ROOTFS_DIR" \
-      --admindir="$PWD/dpkg_admin" \
-      --log="$PWD/dpkg_admin/dpkg.log" \
-      --force-script-chrootless \
-      ${DPKG_EXTRA_ARGS} \
-      --no-triggers \
-      --unpack "$(get_package_path $1)"
-  set +o noglob
-}
+  # Relies on GNU sed extension (/dev/stdin file for 'r' command)
+  sed '/^#/d;s/^/    "--/;s/$/";/' "$CONFIGURATION_FOLDER"/dpkg_extra_args 2>/dev/null | \
+  sed "
+  s%PWD%${PWD}%
+  s%REALROOTREL%$(realpath -s --relative-to="$PWD" /)/%
+  /DPKG_EXTRA_ARGS/{r /dev/stdin
+  d}" apt/apt.cfg > apt.cfg
 
-dpkg_install() {
-  apt_download "$1"
-  set -o noglob
-  # shellcheck disable=SC2086
-  fakeroot \
-    dpkg \
-      --instdir="$ROOTFS_DIR" \
-      --admindir="$PWD/dpkg_admin" \
-      --log="$PWD/dpkg_admin/dpkg.log" \
-      --force-script-chrootless \
-      ${DPKG_EXTRA_ARGS} \
-      --install "$(get_package_path $1)"
-  set +o noglob
-}
+  export APT_CONFIG=$PWD/apt.cfg
+  DPKG_EXTRA_ARGS="$(sed '/^#/d;s/^/--/' "${CONFIGURATION_FOLDER}"/dpkg_extra_args | xargs)"
 
-apt-get update
-mkdir -p build/var/lib/dpkg
-touch build/var/lib/dpkg/lock-frontend
-
-# Function to download, patch, and install udeb substitute packages
-install_udeb_substitute() {
-  local udeb_package="$1"
-  local base_package="${udeb_package%-udeb}"
-
-  apt_download "$udeb_package"
-  PACKAGE_PATH="$(get_package_path "$udeb_package")"
-  EXTRACT_DIR="$(mktemp --directory --tmpdir deb-extract.XXX)"
-  dpkg-deb --raw-extract "${PACKAGE_PATH}" "${EXTRACT_DIR}"
-  rm "${PACKAGE_PATH}"
-
-  PACKAGE_VERSION="$(grep -oP '^Version:\s*\K.*' "${EXTRACT_DIR}"/DEBIAN/control)"
-
-  # Check if Provides: line exists
-  if ! grep -q "^Provides:" "${EXTRACT_DIR}/DEBIAN/control"; then
-    # If not, add it before the first line
-    sed -i "1iProvides: ${base_package} (= ${PACKAGE_VERSION}), ${base_package}:arm64" "${EXTRACT_DIR}/DEBIAN/control"
+  # Rebuild helper packages from source if nfpm is available
+  PACKAGES_DIR="$(dirname "${CONFIGURATION_ROOT}")/internal/packages"
+  if command -v nfpm >/dev/null 2>&1 && [ -d "${HELPER_PACKAGES_DIR}" ]; then
+    echo "Rebuilding helper packages..."
+    HELPER_PACKAGES_DIR="${HELPER_PACKAGES_DIR}" PACKAGES_DIR="${PACKAGES_DIR}" build-packages
   else
-    # If it exists, modify it
-    sed --in-place "/^Provides:/s/${base_package},/${base_package} (= ${PACKAGE_VERSION}), ${base_package}:arm64,/" "${EXTRACT_DIR}/DEBIAN/control"
+    echo "nfpm not found, using pre-built packages"
   fi
 
-  echo "Replaces: ${base_package} (= ${PACKAGE_VERSION})
-Conflicts: ${base_package} (= ${PACKAGE_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/control"
-
-  dpkg-deb --root-owner-group --build "${EXTRACT_DIR}" "${PACKAGE_PATH}"
-  rm -rf "${EXTRACT_DIR}"
-
-  set -o noglob
-  # shellcheck disable=SC2086
-  fakeroot \
-    dpkg \
-      --instdir="$ROOTFS_DIR" \
-      --admindir="$PWD/dpkg_admin" \
-      --log="$PWD/dpkg_admin/dpkg.log" \
-      --force-script-chrootless \
-      ${DPKG_EXTRA_ARGS} \
-      --install "${PACKAGE_PATH}"
-  set +o noglob
+  apt-get update
+  mkdir -p build/var/lib/dpkg
+  touch build/var/lib/dpkg/lock-frontend
 }
 
-# Download, patch, install udeb substitute packages
-install_udeb_substitute libc6-udeb
-if [ -f "${CONFIGURATION_FOLDER}/udebs.list" ]; then
-    IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/udebs.list tr '\n' ', ')"
+# ---------------------------------------------------------------------------
+# Phase 2: Install base system
+# ---------------------------------------------------------------------------
 
-    for package in "${array[@]}"
-    do
-      echo "Installing Udeb Substitute: ${package}"
-      install_udeb_substitute "${package}"
-    done
-fi
+install_base_system() {
+  # Download, patch, install udeb substitute packages
+  install_udeb_substitute libc6-udeb
+  if [ -f "${CONFIGURATION_FOLDER}/udebs.list" ]; then
+      IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/udebs.list tr '\n' ', ')"
+      for package in "${array[@]}"; do
+        echo "Installing Udeb Substitute: ${package}"
+        install_udeb_substitute "${package}"
+      done
+  fi
 
-dpkg_install busybox
+  dpkg_install busybox
 
-cd build/bin
-ln -s busybox sh
-ln -s busybox base64
-ln -s mawk awk
-echo '#!/bin/sh' > update-alternatives
-echo 'return 0' >> update-alternatives
-chmod +x update-alternatives
-cp update-alternatives dpkg-trigger
-cp update-alternatives dpkg-maintscript-helper
-cp update-alternatives dpkg-divert
-cp update-alternatives deb-systemd-helper
-cp update-alternatives dpkg
-cd - >/dev/null
+  # Create busybox stub scripts for dpkg helpers (no-ops during cross-install)
+  cd build/bin
+  ln -s busybox sh
+  ln -s busybox base64
+  ln -s mawk awk
+  echo '#!/bin/sh' > update-alternatives
+  echo 'return 0' >> update-alternatives
+  chmod +x update-alternatives
+  cp update-alternatives dpkg-trigger
+  cp update-alternatives dpkg-maintscript-helper
+  cp update-alternatives dpkg-divert
+  cp update-alternatives deb-systemd-helper
+  cp update-alternatives dpkg
+  cd - >/dev/null
 
-# awk is Pre-Depends of base-files (unfortunately)
-dpkg_install mawk
+  # awk is Pre-Depends of base-files (unfortunately)
+  dpkg_install mawk
 
-# Just unpack base-files for now (can't postinst without base-passwd)
-dpkg_unpack base-files
+  # Just unpack base-files for now (can't postinst without base-passwd)
+  dpkg_unpack base-files
 
-cd build/bin
-for util in $(./busybox --list); do
-  # || true prevents failure for already installed utils (like awk)
-  ln -s /bin/busybox "$util" || true
-done
-cd - >/dev/null
+  # Link all busybox applets
+  cd build/bin
+  for util in $(./busybox --list); do
+    ln -s /bin/busybox "$util" || true
+  done
+  cd - >/dev/null
 
-# Need to properly install base-passwd before base-files can be completed
-apt_download libpcre2-8-0 libselinux1 libdebconfclient0 debconf base-passwd
-dpkg_install libpcre2-8-0
-dpkg_install libselinux1
-dpkg_install debconf
-dpkg_install libdebconfclient0
-dpkg_install base-passwd
+  # Need to properly install base-passwd before base-files can be completed
+  apt_download libpcre2-8-0 libselinux1 libdebconfclient0 debconf base-passwd
+  dpkg_install libpcre2-8-0
+  dpkg_install libselinux1
+  dpkg_install debconf
+  dpkg_install libdebconfclient0
+  dpkg_install base-passwd
 
-dpkg_install base-files
+  dpkg_install base-files
 
-# 'mount' will be installed by systemd below, ensure util-linux dep can be met
-dpkg_unpack util-linux-extra
-rm -rf build/etc/init.d
-apt-get --fix-broken install
-
-if [ "${SSH}" = 1 ]
-then
-  echo "Installing SSH!"
-  apt_install dropbear-bin
-  apt_install dropbear-ssh-service
-fi
-
-# TODO: postinst failure, fstrim settings using deb-systemd-helper
-apt_install util-linux
-
-# Install systemd
-apt_install systemd-sysv
-
-# Symlink to regular /sbin/init (systemd-sysv provides /sbin/init)
-ln -s /sbin/init build/init
-
-if [ "${UDEV}" = 1 ]
-then
-  echo "Installing UDEV!"
-  # libc-bin required for passwd postinst
-  apt_install libc-bin
-
-  # Setup passwd (udev dep)
-  apt_install passwd
-
-  # Install perl-base, addgroup dep (used by udev postinst)
-  apt_install perl-base
-
-  # Setup udev
-  dpkg_unpack udev
+  # 'mount' will be installed by systemd below, ensure util-linux dep can be met
+  dpkg_unpack util-linux-extra
   rm -rf build/etc/init.d
   apt-get --fix-broken install
-fi
 
-IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\n' ', ')"
+  # Init-specific packages (systemd-sysv or busybox init link)
+  install_init_packages
+}
 
-for package in "${array[@]}"
-do
-   echo "Installing ${package}"
-   apt_install "${package}"
-done
+# ---------------------------------------------------------------------------
+# Phase 3: Install optional components (SSH, udev, networking, user packages)
+# ---------------------------------------------------------------------------
 
-
-if [ "${NETWORK}" = 1 ]
-then
-  if [ "${UDEV}" = 1 ]
-  then
-    echo "Installing & Enabling networking"
-    apt_install systemd-timesyncd
-    cp "${PREBUILTS_DIR}"/20-wired.network build/etc/systemd/network/20-wired.network
-    mkdir -p build/var/lib/systemd/timesync/
-    cp "${PREBUILTS_DIR}"/timesyncd.conf build/etc/systemd/timesyncd.conf
-    sed -i "s/After=systemd-sysusers.service/After=systemd-sysusers.service, network-online.target/" ./build/usr/lib/systemd/system/systemd-timesyncd.service
-    sed -i "s/Wants=time-set.target/Wants=network-online.target/" build/usr/lib/systemd/system/systemd-timesyncd.service
-    sed -i "s/Before=time-set.target sysinit.target shutdown.target//" build/usr/lib/systemd/system/systemd-timesyncd.service
-
-    mkdir -p build/etc/systemd/system
-    ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/dbus-org.freedesktop.network1.service
-    mkdir -p build/etc/systemd/system/multi-user.target.wants
-    ln -s /lib/systemd/system/systemd-networkd.service build/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
-    ln -s /lib/systemd/system/systemd-resolved.service build/etc/systemd/system/multi-user.target.wants/systemd-resolved.service
-    echo "nameserver 8.8.8.8
-nameserver 8.8.4.4
-" > build/etc/resolv.conf
-    mkdir -p build/etc/ssl/certs/ 
-    
-    # ca-certificates are not installed into the correct directory by default
-    # Importing the required certificates from the Host machine
-    cp -r /etc/ssl/certs/* build/etc/ssl/certs/
-    cp /etc/ca-certificates.conf build/etc/ca-certificates.conf
-
-    mkdir -p build/etc/systemd/system/sockets.target.wants
-    ln -s /lib/systemd/system/systemd-networkd.socket build/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
-    mkdir -p build/etc/systemd/system/sysinit.target.wants
-    ln -s /lib/systemd/system/systemd-network-generator.service build/etc/systemd/system/sysinit.target.wants/systemd-network-generator.service
-    mkdir -p build/etc/systemd/system/network-online.target.wants
-    ln -s /lib/systemd/system/systemd-networkd-wait-online.service build/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service
-
-  else
-    echo "--------------- ERROR - Network cannot be installed without UDEV Support. This component will not work! --------------------"
+install_components() {
+  if [ "${SSH}" = 1 ]; then
+    echo "Installing SSH!"
+    apt_install dropbear-bin
+    apt_install dropbear-ssh-service
   fi
-fi
 
-rm build/bin/dpkg-*
-rm build/bin/dpkg
+  if [ "${UDEV}" = 1 ]; then
+    echo "Installing UDEV!"
+    apt_install libc-bin
+    apt_install passwd
+    apt_install perl-base
 
-PATH="${CONFIGURATION_FOLDER}:${PATH}" "${CONFIGURATION_FOLDER}"/installer_scripts.list
-
-# getty-static.service starts tty2-tty6 if dbus / logind are not available
-# Override this behaviour
-mkdir -p build/etc/systemd/system/getty-static.service.d
-echo "[Service]
-ExecStart=
-ExecStart=/bin/true
-" > build/etc/systemd/system/getty-static.service.d/override.conf
-
-# serial-getty waits for device unit (using udev) by default, disable this if
-# udev is not used. Always make a copy of serial-getty@.service in 'etc'.
-if [ "${UDEV}" = 1 ]
-then
-  cp build/usr/lib/systemd/system/serial-getty@.service \
-    build/etc/systemd/system/serial-getty@.service
-else
-  sed '
-  /^BindsTo/d
-  /^After=/s/dev-%i\.device\s*//' \
-    build/usr/lib/systemd/system/serial-getty@.service \
-    > build/etc/systemd/system/serial-getty@.service
-fi
-
-if [ "${AUTOLOGIN}" = 1 ]
-then
-  # Ensure getty on tty1 is autologin
-  mkdir -p build/etc/systemd/system/getty@tty1.service.d
-  # shellcheck disable=SC2028
-  echo "[Service]
-  ExecStart=
-  ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin root %I \$TERM
-  TTYVTDisallocate=no
-  " > build/etc/systemd/system/getty@tty1.service.d/autologin.conf
-
-  sed --in-place '
-  s/\(--keep-baud\)/--noclear --autologin root \1/' \
-    build/etc/systemd/system/serial-getty@.service
-fi
-
-sed -i 's:/bin/bash:/bin/sh:g' build/etc/passwd
-# Ensure compressed modules can be loaded (busybox implementation of modprobe
-# is insufficient)
-dpkg_unpack kmod
-rm -rf build/etc/init.d
-apt-get --fix-broken install
-
-apt_install xz-utils
-
-# Boot firmare
-apt_download raspi-firmware
-mkdir raspi-firmware
-RASPI_FIRMWARE_SUBDIR="./usr/lib/raspi-firmware/"
-PATH_COMPONENTS="$(echo $RASPI_FIRMWARE_SUBDIR | grep -o "/" | wc -l)"
-dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
-	tar \
-		--extract \
-		--directory="raspi-firmware" \
-		--strip-components="$PATH_COMPONENTS" \
-		$RASPI_FIRMWARE_SUBDIR
-
-if [ "${HAS_CUSTOM_KERNEL}" = 1 ]
-then
-  # To use custom kernel, provide the following
-  # KERNEL_MODULES_DIR=/path/to/built/kernel/modules
-  # HAS_CUSTOM_KERNEL=1
-  # CUSTOM_KERNEL_VERSION_STR="" e.g. "6.12.40-v8+"
-  # CUSTOM_KERNEL_PATH=/path/to/your/Image.gz
-  # Will use default kernel for device trees, but will use custom kernel for modules and kernel.img
-
-  echo "Using custom kernel"
-  KERNEL_VERSION_STR="${CUSTOM_KERNEL_VERSION_STR}"
-  KPKG_EXTRACT="${KERNEL_MODULES_DIR}"
-else
-  # Find kernel
-  KERNEL_META=linux-image-rpi-v8
-  KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
-  apt_download "$KERNEL_PACKAGE"
-  KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
-  apt_download "${KERNEL_PACKAGE}"
-
-  KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
-  dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
-  # Depmod (see below) hard-codes /lib path, ensure the symlink exists
-  if [ ! -e "${KPKG_EXTRACT}/lib" ]; then
-    ln -s "${KPKG_EXTRACT}/usr/lib" "${KPKG_EXTRACT}/lib"
+    dpkg_unpack udev
+    rm -rf build/etc/init.d
+    apt-get --fix-broken install
   fi
-fi
 
-# Copy requested kernel modules (+deps) into image and generate module dependencies
-#
-# Generate modules.dep.bin metadata for uninstalled pacakge
-depmod --basedir "${KPKG_EXTRACT}" "${KERNEL_VERSION_STR}"
-# Copy modules
-rpi-modcopy \
-  --kernel-version="${KERNEL_VERSION_STR}" \
-  --module-file="${CONFIGURATION_FOLDER}"/kernel_modules.list \
-  "${KPKG_EXTRACT}" \
-  "${ROOTFS_DIR}"
-
-# Manually form-up the kernel and bootfs
-mkdir -p "${OUT_DIR}"/overlays
-
-if [ "${HAS_CUSTOM_KERNEL}" = 1 ]
-then
-  # Assumes that provided kernel did not provide device trees etc.
-  KERNEL_META=linux-image-rpi-v8
-  KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
-  apt_download "$KERNEL_PACKAGE"
-  KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
-  apt_download "${KERNEL_PACKAGE}"
-
-  KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
-  dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
-
-  echo "Copying Custom Kernel"
-  cp ${CUSTOM_KERNEL_PATH} ${OUT_DIR}/zImage
-else
-  mv "${KPKG_EXTRACT}"/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/zImage
-fi
-
-mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
-mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/overlay_map.dtb "${OUT_DIR}"/overlays/
-mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/dwc2.dtbo "${OUT_DIR}"/overlays/
-mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt.dtbo "${OUT_DIR}"/overlays/
-mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi.dtbo "${OUT_DIR}"/overlays/
-
-mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
-
-cp "${PREBUILTS_DIR}"/config.txt "${OUT_DIR}"/config.txt
-cp "${PREBUILTS_DIR}"/cmdline.txt "${OUT_DIR}"/cmdline.txt
-
-if [ "$#" -eq 1 ]; then
-  echo "No target devices specified, building for all devices"
-  rsync --archive raspi-firmware/ "${OUT_DIR}"/
-  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/*.dtb "${OUT_DIR}"/
-  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
-else
-  IFS=',' read -ra target_devices <<< "$2"
-  for arg in "${target_devices[@]}";
-  do 
-    echo "Installing files for ${arg}"
-    if [ "${arg}" == "cm5" ]; then
-      # cm5 Files
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-cm5-cm4io.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-cm5-cm5io.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-cm5l-cm4io.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-cm5l-cm5io.dtb "${OUT_DIR}"/
-
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/bcm2712d0.dtbo "${OUT_DIR}"/overlays/
-    fi
-    if [ "${arg}" == "500" ]; then
-      # 500 Files
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-500.dtb "${OUT_DIR}"/
-
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/bcm2712d0.dtbo "${OUT_DIR}"/overlays/
-    fi
-    if [ "${arg}" == "pi5" ]; then
-      # pi5 Files
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712d0-rpi-5-b.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-d-rpi-5-b.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2712-rpi-5-b.dtb "${OUT_DIR}"/
-
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi-pi5.dtbo "${OUT_DIR}"/overlays/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/bcm2712d0.dtbo "${OUT_DIR}"/overlays/
-    fi
-    if [ "${arg}" == "cm4" ]; then
-      # cm4 Files
-      cp raspi-firmware/start4.elf "${OUT_DIR}"/
-      cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-cm4.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-cm4s.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-cm4-io.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi4.dtbo "${OUT_DIR}"/overlays/
-    fi
-    if [ "${arg}" == "400" ]; then
-      # 400 Files
-      cp raspi-firmware/start4.elf "${OUT_DIR}"/
-      cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-400.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi4.dtbo "${OUT_DIR}"/overlays/
-    fi
-    if [ "${arg}" == "pi4" ]; then
-      # pi4 Files
-      cp raspi-firmware/start4*.elf "${OUT_DIR}"/
-      cp raspi-firmware/fixup4*.dat "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2711-rpi-4-b.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/vc4-kms-v3d-pi4.dtbo "${OUT_DIR}"/overlays/
-    fi
-    if [ "${arg}" == "pi3" ]; then
-      # pi3 Files
-      cp raspi-firmware/* "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2710-rpi-3-b-plus.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2710-rpi-3-b.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-3-a-plus.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-3-b.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-3-b-plus.dtb "${OUT_DIR}"/
-    fi
-    if [ "${arg}" == "cm3" ]; then
-      # cm3 Files
-      cp raspi-firmware/* "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2710-rpi-cm3.dtb "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-cm3-io3.dtb "${OUT_DIR}"/
-    fi
-    
-    if [ "${arg}" == "02W" ]; then
-      # 02W Files
-      cp raspi-firmware/* "${OUT_DIR}"/
-      cp "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/bcm2837-rpi-zero-2-w.dtb "${OUT_DIR}"/
-    fi
+  # Install configuration-specific packages
+  IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\n' ', ')"
+  for package in "${array[@]}"; do
+     echo "Installing ${package}"
+     apt_install "${package}"
   done
-fi
 
-# Custom (no udev requirement) systemd-modules-load.service
-if [ -z "${UDEV}" ]
-then
-  cp "${PREBUILTS_DIR}"/load_modules.sh build/usr/local/bin/load_modules
-  cp "${PREBUILTS_DIR}"/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
-else
-  # Installed perl to help udev postinst, however don't need in final image
-  rm -rf build/usr/lib/aarch64-linux-gnu/perl-base
-  rm -rf build/usr/bin/perl
-  rm -rf build/usr/bin/perl5.36.0
-fi
+  if [ "${NETWORK}" = 1 ]; then
+    if [ "${SYSTEMD}" != 0 ] && [ "${UDEV}" != 1 ]; then
+      echo "ERROR: systemd networking requires UDEV support." >&2
+      exit 1
+    fi
+    install_networking
+  fi
+}
 
-if [ "$USES_CUSTOM_LOGO" = 1 ]
-then
-  ## Copy in our splashscreen files:
-  mkdir -p build/lib/firmware
-  cp "${CONFIGURATION_FOLDER}"/*.tga build/lib/firmware/
-fi
+# ---------------------------------------------------------------------------
+# Phase 4: Configure system services and image customisation
+# ---------------------------------------------------------------------------
 
-if [ -f "${CONFIGURATION_FOLDER}/cmdline.txt" ]
-then
-  # Users can specify custom cmdline.txt's in the configuration directory
-  # see rpi-imager-embedded for example
-  cp "${CONFIGURATION_FOLDER}/cmdline.txt" "${OUT_DIR}"/cmdline.txt
-fi
+configure_system() {
+  # Clean up dpkg stub scripts
+  rm build/bin/dpkg-*
+  rm build/bin/dpkg
 
-if [ "${SSH}" = 1 ]
-then
-  echo "Installing SSH!"
-  mkdir -p build/root/.ssh
-  cat "${PREBUILTS_DIR}"/authorized_keys > build/root/.ssh/authorized_keys
-  chmod 0600 build/root/.ssh/authorized_keys
-  mkdir build/dev/pts
-fi
-if [ -f "${CONFIGURATION_FOLDER}"/post_creation.sh ]
-then
-  # Run post-creation script
-  "${CONFIGURATION_FOLDER}"/post_creation.sh
-fi
+  # Run configuration-specific installer scripts
+  PATH="${CONFIGURATION_FOLDER}:${PATH}" "${CONFIGURATION_FOLDER}"/installer_scripts.list
 
-# Package initramfs
-cd build
+  # Init-specific service configuration (systemd units or inittab)
+  configure_init_services
 
-# Delete unecessary packages
-if [ -f "${CONFIGURATION_FOLDER}/delete.list" ]; then
-    IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/delete.list tr '\n' ', ')"
-    for package in "${array[@]}"
-    do
-      echo "Deleting: ${package}"
-      rm -rf ${package}
+  sed -i 's:/bin/bash:/bin/sh:g' build/etc/passwd
+
+  # Ensure compressed modules can be loaded (busybox modprobe is insufficient)
+  dpkg_unpack kmod
+  rm -rf build/etc/init.d
+  apt-get --fix-broken install
+
+  apt_install xz-utils
+
+  # Module loading setup (init-specific)
+  if [ -z "${UDEV}" ]; then
+    configure_init_modules
+  else
+    # Installed perl to help udev postinst, however don't need in final image
+    rm -rf build/usr/lib/aarch64-linux-gnu/perl-base
+    rm -rf build/usr/bin/perl
+    rm -rf build/usr/bin/perl5.36.0
+  fi
+
+  if [ "$USES_CUSTOM_LOGO" = 1 ]; then
+    mkdir -p build/lib/firmware
+    cp "${CONFIGURATION_FOLDER}"/*.tga build/lib/firmware/
+  fi
+
+  if [ "${SSH}" = 1 ]; then
+    echo "Configuring SSH!"
+    mkdir -p build/root/.ssh
+    cat "${PREBUILTS_DIR}"/authorized_keys > build/root/.ssh/authorized_keys
+    chmod 0600 build/root/.ssh/authorized_keys
+    mkdir -p build/dev/pts
+
+    # Init-specific SSH startup
+    configure_init_ssh
+  fi
+
+  if [ -f "${CONFIGURATION_FOLDER}"/post_creation.sh ]; then
+    "${CONFIGURATION_FOLDER}"/post_creation.sh
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Phase 5: Prepare kernel and boot firmware
+# ---------------------------------------------------------------------------
+
+prepare_kernel_and_firmware() {
+  # Boot firmware
+  apt_download raspi-firmware
+  mkdir raspi-firmware
+  RASPI_FIRMWARE_SUBDIR="./usr/lib/raspi-firmware/"
+  PATH_COMPONENTS="$(echo $RASPI_FIRMWARE_SUBDIR | grep -o "/" | wc -l)"
+  dpkg-deb --fsys-tarfile "$(get_package_path raspi-firmware)" | \
+  	tar \
+  		--extract \
+  		--directory="raspi-firmware" \
+  		--strip-components="$PATH_COMPONENTS" \
+  		$RASPI_FIRMWARE_SUBDIR
+
+  if [ "${HAS_CUSTOM_KERNEL}" = 1 ]; then
+    # To use custom kernel, provide the following in build.parameters:
+    # KERNEL_MODULES_DIR=/path/to/built/kernel/modules
+    # HAS_CUSTOM_KERNEL=1
+    # CUSTOM_KERNEL_VERSION_STR="" e.g. "6.12.40-v8+"
+    # CUSTOM_KERNEL_PATH=/path/to/your/Image.gz
+    # Will use default kernel for device trees, but will use custom kernel for modules and kernel.img
+
+    echo "Using custom kernel"
+    KERNEL_VERSION_STR="${CUSTOM_KERNEL_VERSION_STR}"
+    KPKG_EXTRACT="${KERNEL_MODULES_DIR}"
+  else
+    KERNEL_META=linux-image-rpi-v8
+    KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
+    apt_download "$KERNEL_PACKAGE"
+    KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
+    apt_download "${KERNEL_PACKAGE}"
+
+    KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
+    dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
+    # Depmod (see below) hard-codes /lib path, ensure the symlink exists
+    if [ ! -e "${KPKG_EXTRACT}/lib" ]; then
+      ln -s "${KPKG_EXTRACT}/usr/lib" "${KPKG_EXTRACT}/lib"
+    fi
+  fi
+
+  # Generate modules.dep.bin metadata and copy requested modules (+deps)
+  depmod --basedir "${KPKG_EXTRACT}" "${KERNEL_VERSION_STR}"
+  rpi-modcopy \
+    --kernel-version="${KERNEL_VERSION_STR}" \
+    --module-file="${CONFIGURATION_FOLDER}"/kernel_modules.list \
+    "${KPKG_EXTRACT}" \
+    "${ROOTFS_DIR}"
+
+  # Assemble boot partition
+  mkdir -p "${OUT_DIR}"/overlays
+
+  if [ "${HAS_CUSTOM_KERNEL}" = 1 ]; then
+    # Custom kernel: still need standard kernel package for device trees
+    KERNEL_META=linux-image-rpi-v8
+    KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
+    apt_download "$KERNEL_PACKAGE"
+    KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
+    apt_download "${KERNEL_PACKAGE}"
+
+    KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
+    dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
+
+    echo "Copying Custom Kernel"
+    cp ${CUSTOM_KERNEL_PATH} ${OUT_DIR}/zImage
+  else
+    mv "${KPKG_EXTRACT}"/boot/vmlinuz-${KERNEL_VERSION_STR} ${OUT_DIR}/zImage
+  fi
+
+  # Common overlays included in every image
+  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/README "${OUT_DIR}"/overlays/
+  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/overlay_map.dtb "${OUT_DIR}"/overlays/
+  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/dwc2.dtbo "${OUT_DIR}"/overlays/
+  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-bt.dtbo "${OUT_DIR}"/overlays/
+  mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/disable-wifi.dtbo "${OUT_DIR}"/overlays/
+
+  mv "${KPKG_EXTRACT}"/boot/* "${OUT_DIR}"/
+
+  cp "${PREBUILTS_DIR}"/config.txt "${OUT_DIR}"/config.txt
+  cp "${PREBUILTS_DIR}"/cmdline.txt "${OUT_DIR}"/cmdline.txt
+
+  if [ -f "${CONFIGURATION_FOLDER}/cmdline.txt" ]; then
+    cp "${CONFIGURATION_FOLDER}/cmdline.txt" "${OUT_DIR}"/cmdline.txt
+  fi
+
+  # Install device-specific files
+  if [ "$#" -eq 1 ]; then
+    echo "No target devices specified, building for all devices"
+    rsync --archive raspi-firmware/ "${OUT_DIR}"/
+    mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/broadcom/*.dtb "${OUT_DIR}"/
+    mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
+  else
+    IFS=',' read -ra target_devices <<< "$2"
+    for target in "${target_devices[@]}"; do
+      echo "Installing files for ${target}"
+      install_device_files "$target"
     done
-fi
+  fi
+}
 
-# Delete unecessary packages
-if [ -f "${CONFIGURATION_FOLDER}/generic_delete.list" ]; then
-    IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/generic_delete.list tr '\n' ', ')"
-    for package in "${array[@]}"
-    do
-      echo "Deleting: ${package}"
-      rm -rf $(find . -name *${package}*)
-    done
-fi
+# ---------------------------------------------------------------------------
+# Phase 6: Package the image
+# ---------------------------------------------------------------------------
 
-echo "Compressing & creating boot image"
+package_image() {
+  cd build
 
-find . -print0 | cpio --owner=0:0 --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
-cd ..
-zstd --no-progress --ultra --long --rm -22 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
+  # Delete paths listed in delete.list
+  if [ -f "${CONFIGURATION_FOLDER}/delete.list" ]; then
+      IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/delete.list tr '\n' ', ')"
+      for entry in "${array[@]}"; do
+        echo "Deleting: ${entry}"
+        rm -rf ${entry}
+      done
+  fi
 
-echo "Making boot img"
-echo "Out directory = ${OUT_DIR}"
-mkdir -p "${OUT_DIR}"
-rpi-make-boot-image -d "${OUT_DIR}"/ -o "${OUT_IMAGE_NAME}" -a "${KERNEL_BIT_SIZE}"
+  # Delete paths matching patterns in generic_delete.list
+  if [ -f "${CONFIGURATION_FOLDER}/generic_delete.list" ]; then
+      IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/generic_delete.list tr '\n' ', ')"
+      for pattern in "${array[@]}"; do
+        echo "Deleting: ${pattern}"
+        find . -name "*${pattern}*" -exec rm -rf {} +
+      done
+  fi
 
-echo "Making 2710 bootfiles"
-ln -s "${OUT_DIR}" 2710
-tar --create --dereference --file "${OUT_2710_NAME}" 2710
-unlink 2710
+  echo "Compressing & creating boot image"
+
+  find . -print0 | cpio --owner=0:0 --null -ov --format=newc > ../initramfs.cpio 2>/dev/null
+  cd ..
+  zstd --no-progress --ultra --long --rm -22 initramfs.cpio -o "${OUT_DIR}"/rootfs.cpio.zst
+
+  echo "Making boot img"
+  echo "Out directory = ${OUT_DIR}"
+  mkdir -p "${OUT_DIR}"
+  rpi-make-boot-image -d "${OUT_DIR}"/ -o "${OUT_IMAGE_NAME}" -a "${KERNEL_BIT_SIZE}"
+
+  echo "Making 2710 bootfiles"
+  ln -s "${OUT_DIR}" 2710
+  tar --create --dereference --file "${OUT_2710_NAME}" 2710
+  unlink 2710
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+prepare_build_env
+install_base_system
+install_components
+configure_system
+prepare_kernel_and_firmware "$@"
+package_image

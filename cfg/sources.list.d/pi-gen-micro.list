@@ -1,1 +1,0 @@
-deb [trusted=yes] file:/var/lib/pi-gen-micro/packages ./

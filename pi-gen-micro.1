@@ -1,0 +1,295 @@
+.\" pi-gen-micro - build minimal Raspberry Pi OS images
+.TH PI\-GEN\-MICRO 1 "2026-03-20" "pi-gen-micro" "Raspberry Pi Tools"
+.SH NAME
+pi\-gen\-micro \- build minimal Raspberry Pi OS images from Debian package sources
+.SH SYNOPSIS
+.B pi\-gen\-micro
+.I configuration
+.RI [ target_devices ]
+.br
+.B pi\-gen\-micro \-\-list\-configurations
+.br
+.B pi\-gen\-micro \-\-list\-packages
+.br
+.B pi\-gen\-micro \-h | \-\-help
+.SH DESCRIPTION
+.B pi\-gen\-micro
+builds tiny embedded operating system images for Raspberry Pi devices using the
+same package sources as Raspberry Pi OS. Images are built as initramfs-based boot
+images suitable for embedded systems, device provisioning, and IoT applications.
+.PP
+The tool assembles a minimal root filesystem by installing Debian packages into a
+build directory using
+.BR fakeroot (1)
+and
+.BR dpkg (1),
+then compresses the result into a bootable image using
+.BR rpi\-make\-boot\-image .
+.PP
+Output is written to
+.I $PWD/out_image/\fR.
+It is recommended to run from a temporary directory to avoid polluting the
+working directory:
+.PP
+.RS
+.nf
+pushd $(mktemp \-d)
+sudo pi\-gen\-micro fastboot
+.fi
+.RE
+.SH OPTIONS
+.TP
+.I configuration
+Name of the configuration to build. Required. Use
+.B \-\-list\-configurations
+to see what is available.
+.TP
+.I target_devices
+Optional comma-separated list of target devices. Limits which device trees and
+firmware files are included in the image. If omitted, files for all supported
+devices are included.
+.RS
+.PP
+Supported targets:
+.BR pi3 ", " cm3 ", " pi4 ", " 400 ", " cm4 ", " pi5 ", " 500 ", " cm5 ", " 02W
+.RE
+.TP
+.B \-h\fR, \fB\-\-help
+Show usage information and exit.
+.TP
+.B \-\-list\-configurations
+List available configurations with their descriptions and exit.
+Descriptions are read from the
+.I description
+file in each configuration directory.
+.TP
+.B \-\-list\-packages
+List available helper packages with their descriptions and exit.
+Descriptions are read from the
+.I description
+field in each package's
+.I nfpm.yaml
+file.
+.SH CONFIGURATIONS
+A configuration is a directory containing files that define what goes into the
+image. Built-in configurations are installed to
+.IR /var/lib/pi\-gen\-micro/configurations/ .
+.PP
+Run
+.B pi\-gen\-micro \-\-list\-configurations
+to see available configurations and their descriptions.
+.SS Required files
+.TP
+.B build.parameters
+Sourced as a shell script. Sets build-time variables:
+.RS
+.TP
+.B KERNEL_BIT_SIZE
+Kernel architecture, default
+.IR 64 .
+.TP
+.B HAS_CUSTOM_KERNEL
+Set to
+.I 1
+to use a custom kernel. Also requires
+.B CUSTOM_KERNEL_PATH
+and
+.BR CUSTOM_KERNEL_VERSION_STR .
+.RE
+.TP
+.B components.parameters
+Sourced as a shell script. Feature flags controlling what is installed:
+.RS
+.TP
+.B SYSTEMD=1
+Use systemd as the init system (default). Set to
+.I 0
+for a busybox init alternative using
+.I /etc/inittab
+and shell scripts. Some helper packages (e.g.\&
+.BR cryptroot )
+require systemd.
+.TP
+.B SSH=1
+Install dropbear SSH server. Requires a populated
+.I authorized_keys
+file in the prebuilts directory.
+.TP
+.B UDEV=1
+Install udev for dynamic device management.
+.TP
+.B NETWORK=1
+Install networking. With systemd: systemd-networkd and systemd-resolved
+(requires
+.BR UDEV=1 ).
+Without systemd: busybox
+.BR udhcpc .
+.TP
+.B AUTOLOGIN=1
+Enable automatic root login on console and serial.
+.RE
+.TP
+.B packages.list
+Newline-separated list of additional packages to install. Packages are
+resolved from the configured APT sources, including the local helper
+package repository.
+.TP
+.B kernel_modules.list
+Newline-separated list of kernel modules to include. Module dependencies
+are resolved and copied using
+.BR rpi\-modcopy .
+.TP
+.B installer_scripts.list
+An executable script run after packages are installed. Despite the
+.I .list
+extension, this file is
+.I executed
+as a shell script, not read as a list. The configuration directory is
+prepended to
+.BR PATH ,
+so other scripts in the directory can be called by name.
+.TP
+.B dpkg_extra_args
+dpkg
+.BR path-exclude / path-include
+rules to reduce image size by stripping documentation, locales, etc.
+Lines starting with
+.B #
+are comments.
+.SS Optional files
+.TP
+.B description
+A one-line description of the configuration, shown by
+.B \-\-list\-configurations
+and in error messages.
+.TP
+.B cmdline.txt
+Custom kernel command line, overriding the default from prebuilts.
+.TP
+.B post_creation.sh
+Executable script run after the full image is assembled.
+.TP
+.B udebs.list
+Newline-separated list of udeb packages to install as substitute packages.
+.TP
+.B delete.list
+Newline-separated list of paths to delete from the final image.
+.TP
+.B generic_delete.list
+Newline-separated list of filename patterns to delete from the final image,
+matched by
+.BR find (1)
+.BR \-name .
+.SH HELPER PACKAGES
+.B pi\-gen\-micro
+ships with a local APT repository at
+.IR /var/lib/pi\-gen\-micro/internal/packages/ .
+Package sources live under
+.IR /var/lib/pi\-gen\-micro/helper\-packages/ ,
+each containing an
+.I nfpm.yaml
+and the files to package.
+.PP
+If
+.BR nfpm (1)
+is installed, all helper packages are automatically rebuilt from source at the
+start of each build. Otherwise, pre-built
+.I .deb
+files are used.
+.PP
+Run
+.B pi\-gen\-micro \-\-list\-packages
+to see available helper packages and their descriptions.
+.PP
+To add a new helper package, create a directory with an
+.I nfpm.yaml
+and add it to
+.I debian/install
+under
+.IR /var/lib/pi\-gen\-micro/helper\-packages/ .
+Reference the package name in a configuration's
+.IR packages.list .
+.PP
+External
+.I .deb
+files not built from nfpm sources can be placed directly in the
+.I internal/packages/
+directory. After adding or removing external packages, regenerate the index:
+.PP
+.RS
+.nf
+cd /var/lib/pi\-gen\-micro/internal/packages
+dpkg\-scanpackages . /dev/null | gzip \-9c > Packages.gz
+.fi
+.RE
+.SH ENVIRONMENT
+.TP
+.B CONFIGURATION_ROOT
+Path to the configurations directory. Default:
+.IR /var/lib/pi\-gen\-micro/configurations/ .
+.TP
+.B APT_DPKG_CFG
+Path to the APT/dpkg configuration directory. Default:
+.IR /var/lib/pi\-gen\-micro/internal/apt .
+.TP
+.B PREBUILTS_DIR
+Path to the prebuilt files directory. Default:
+.IR /var/lib/pi\-gen\-micro/internal/prebuilts .
+.TP
+.B HELPER_PACKAGES_DIR
+Path to helper package sources. Default:
+.IR /var/lib/pi\-gen\-micro/helper\-packages .
+.SH EXAMPLES
+Build the fastboot image for all devices:
+.PP
+.RS
+.nf
+pushd $(mktemp \-d)
+sudo pi\-gen\-micro fastboot
+.fi
+.RE
+.PP
+Build for specific devices only:
+.PP
+.RS
+.nf
+sudo pi\-gen\-micro fastboot cm5,pi5
+.fi
+.RE
+.PP
+List what's available:
+.PP
+.RS
+.nf
+pi\-gen\-micro \-\-list\-configurations
+pi\-gen\-micro \-\-list\-packages
+.fi
+.RE
+.SH FILES
+.TP
+.I /var/lib/pi\-gen\-micro/configurations/
+Built-in configuration directories.
+.TP
+.I /var/lib/pi\-gen\-micro/helper\-packages/
+Source directories for helper packages (nfpm definitions).
+.TP
+.I /var/lib/pi\-gen\-micro/internal/packages/
+Local APT repository containing helper
+.I .deb
+packages.
+.TP
+.I /var/lib/pi\-gen\-micro/internal/apt/
+APT and dpkg configuration used during image builds.
+.TP
+.I /var/lib/pi\-gen\-micro/internal/prebuilts/
+Pre-built files copied into images (config.txt, cmdline.txt, passwd, etc.).
+.SH SEE ALSO
+.BR build\-packages (1),
+.BR nfpm (1),
+.BR dpkg (1),
+.BR fakeroot (1),
+.BR rpi\-make\-boot\-image (1)
+.SH AUTHORS
+Richard Oliver <richard.oliver@raspberrypi.com>
+.br
+Tom Dewey <tom.dewey@raspberrypi.com>
