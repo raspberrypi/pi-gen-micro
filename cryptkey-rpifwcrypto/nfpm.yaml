@@ -5,7 +5,7 @@
 name: "cryptkey-rpifwcrypto"
 arch: "arm64"
 platform: "linux"
-version: "1.0.0"
+version: "1.0.1"
 section: "default"
 priority: "extra"
 
@@ -15,8 +15,8 @@ description: "Cryptographic key fetcher using rpifwcrypto HMAC of MMC CID"
 
 depends: 
   - busybox | coreutils
-  - xxd
   - rpifwcrypto
+  - block-device-id
 
 contents:
 - src: cryptkey-rpifwcrypto

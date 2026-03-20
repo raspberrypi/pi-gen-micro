@@ -4,11 +4,6 @@
 
 set -e
 
-die() {
-    echo "$@" >&2
-    exit 1
-}
-
 usage() {
     cat <<EOF
    $(basename "$0") <block_device>
@@ -28,92 +23,13 @@ EOF
 exit 1
 }
 
-read_sys_file() {
-    if [ -f "$1" ]; then
-        cat "$1" 2>/dev/null || echo ""
-    else
-        echo ""
-    fi
-}
-
-# Check if rpi-fw-crypto is available
-if [ -z "$(which rpi-fw-crypto)" ]; then
-    die "rpi-fw-crypto command missing. Please install the rpifwcrypto package."
-fi
-
 # Get block device from argument (required)
 BLOCK_DEVICE="$1"
 if [ -z "$BLOCK_DEVICE" ]; then
     usage
 fi
 
-# Strip /dev/ prefix if present
-DEVICE="${BLOCK_DEVICE#/dev/}"
-
-# Extract base device name (remove partition)
-BASE_DEVICE="$DEVICE"
-case "$DEVICE" in
-    mmcblk*)
-        # MMC: mmcblk0p1 -> mmcblk0
-        BASE_DEVICE="${DEVICE%%p[0-9]*}"
-        ;;
-    nvme*)
-        # NVMe: nvme0n1p1 -> nvme0n1
-        BASE_DEVICE="${DEVICE%%p[0-9]*}"
-        ;;
-    *)
-        # SATA/SCSI: sda1 -> sda (strip trailing digits)
-        BASE_DEVICE="$(echo "$DEVICE" | sed 's/[0-9]*$//')"
-        ;;
-esac
-
-SYS_BLOCK_PATH="/sys/class/block/$BASE_DEVICE"
-
-if [ ! -d "$SYS_BLOCK_PATH" ]; then
-    die "Block device $BASE_DEVICE not found in sysfs"
-fi
-
-# Check if this is a USB device - not supported
-if [ -e "$SYS_BLOCK_PATH/device" ]; then
-    DEVICE_PATH="$(readlink -f "$SYS_BLOCK_PATH/device")" || true
-    case "$DEVICE_PATH" in
-        */usb*)
-            die "USB devices are not supported"
-            ;;
-    esac
-fi
-
-# Try to get device unique identifier in order of preference
-# 1. Try MMC/SD Card CID first
-DEVICE_ID="$(read_sys_file "$SYS_BLOCK_PATH/device/cid")"
-
-# 2. Try NVMe EUI
-if [ -z "$DEVICE_ID" ]; then
-    DEVICE_ID="$(read_sys_file "$SYS_BLOCK_PATH/eui")"
-fi
-
-# 3. Try device serial
-if [ -z "$DEVICE_ID" ]; then
-    DEVICE_ID="$(read_sys_file "$SYS_BLOCK_PATH/device/serial")"
-fi
-
-if [ -z "$DEVICE_ID" ]; then
-    die "Could not read device unique identifier from $BASE_DEVICE"
-fi
-
-# Create a temporary file for the device ID data (rpi-fw-crypto requires file input)
-ID_TMPFILE="$(mktemp)" || die "Failed to create temporary file"
-trap "rm -f '$ID_TMPFILE'" EXIT
-
-# Convert device ID from hex to binary and write to temp file
-echo -n "$DEVICE_ID" | xxd -r -p > "$ID_TMPFILE" || die "Failed to convert device ID to binary"
-
-# Use rpi-fw-crypto to generate HMAC using key slot 1
-# The output is in binary format by default, we'll convert to base64
-rpi-fw-crypto hmac --in "$ID_TMPFILE" --key-id 1 | base64 -w0 || die "Failed to generate HMAC using rpi-fw-crypto"
-
-# Ensure we output a newline for cleaner output
-echo
+block-device-id /dev/disk/by-label/rootfs | rpi-fw-crypto hmac --in /dev/stdin --key-id 1 --outform hex
 
 exit 0
 
