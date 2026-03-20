@@ -29,7 +29,7 @@ if [ -z "$BLOCK_DEVICE" ]; then
     usage
 fi
 
-block-device-id /dev/disk/by-label/rootfs | rpi-fw-crypto hmac --in /dev/stdin --key-id 1 --outform hex
+block-device-id "$BLOCK_DEVICE" | rpi-fw-crypto hmac --in /dev/stdin --key-id 1 --outform hex
 
 exit 0
 
