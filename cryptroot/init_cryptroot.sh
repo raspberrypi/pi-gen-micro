@@ -36,7 +36,7 @@ if [ -z "$KEY" ]; then
 fi
 
 # Unlock the LUKS container
-echo -n "$KEY" | /sbin/cryptsetup luksOpen "$CRYPT_DEVICE" cryptroot
+printf '%s' "$KEY" | /sbin/cryptsetup luksOpen "$CRYPT_DEVICE" cryptroot
 
 # Mount the root filesystem
 /usr/bin/busybox mount /dev/mapper/cryptroot /mnt
