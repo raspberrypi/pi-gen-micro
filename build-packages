@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+
+set -e
+
+: "${HELPER_PACKAGES_DIR:=/var/lib/pi-gen-micro/helper-packages}"
+: "${PACKAGES_DIR:=/var/lib/pi-gen-micro/internal/packages}"
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [options] [package_dir ...]
+
+Build helper .deb packages from nfpm.yaml definitions and regenerate
+the local package index.
+
+With no arguments, rebuilds all packages found under HELPER_PACKAGES_DIR.
+With arguments, builds only the specified package directories.
+
+Options:
+  -h, --help    Show this help message
+  -n, --dry-run Show what would be built without building
+
+Environment variables:
+  HELPER_PACKAGES_DIR  Path to helper package sources (default: /var/lib/pi-gen-micro/helper-packages)
+  PACKAGES_DIR         Output directory for .deb files (default: /var/lib/pi-gen-micro/internal/packages)
+
+Examples:
+  $(basename "$0")                        # rebuild all
+  $(basename "$0") cryptroot              # rebuild just cryptroot
+  $(basename "$0") cryptroot ssh-service  # rebuild specific packages
+
+To list available packages with descriptions, use:
+  pi-gen-micro --list-packages
+EOF
+    exit 0
+}
+
+list_package_names() {
+    find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name nfpm.yaml -printf '%h\n' | sort | while read -r dir; do
+        printf "  %s\n" "$(basename "$dir")"
+    done
+}
+
+DRY_RUN=0
+TARGETS=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage ;;
+        -n|--dry-run) DRY_RUN=1; shift ;;
+        -*) echo "Unknown option: $1" >&2; exit 1 ;;
+        *) TARGETS+=("$1"); shift ;;
+    esac
+done
+
+if ! command -v nfpm >/dev/null 2>&1; then
+    echo "Error: nfpm is not installed. Install it from https://nfpm.goreleaser.com" >&2
+    exit 1
+fi
+
+# Find package directories to build
+PACKAGE_DIRS=()
+if [ ${#TARGETS[@]} -eq 0 ]; then
+    while IFS= read -r dir; do
+        PACKAGE_DIRS+=("$dir")
+    done < <(find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name nfpm.yaml -printf '%h\n' | sort)
+else
+    for target in "${TARGETS[@]}"; do
+        target="${target%/}"
+        dir="${HELPER_PACKAGES_DIR}/${target}"
+        if [ ! -f "${dir}/nfpm.yaml" ]; then
+            echo "Error: No nfpm.yaml found in ${target}/" >&2
+            echo "Available packages:" >&2
+            list_package_names >&2
+            exit 1
+        fi
+        PACKAGE_DIRS+=("$dir")
+    done
+fi
+
+if [ ${#PACKAGE_DIRS[@]} -eq 0 ]; then
+    echo "No packages found to build." >&2
+    exit 1
+fi
+
+mkdir -p "${PACKAGES_DIR}"
+
+for dir in "${PACKAGE_DIRS[@]}"; do
+    name="$(basename "$dir")"
+    pkg_name="$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$dir/nfpm.yaml")"
+    version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$dir/nfpm.yaml")"
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] Would build: ${pkg_name}_${version}_arm64.deb from ${name}/"
+        continue
+    fi
+
+    echo "Building ${pkg_name} ${version} from ${name}/"
+
+    # Remove any previous version of this package
+    rm -f "${PACKAGES_DIR}/${pkg_name}_"*_arm64.deb
+
+    # Run nfpm from the package directory so relative src: paths resolve
+    (cd "$dir" && nfpm package \
+        --config nfpm.yaml \
+        --packager deb \
+        --target "${PACKAGES_DIR}/")
+done
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    echo "[dry-run] Would regenerate ${PACKAGES_DIR}/Packages.gz"
+    exit 0
+fi
+
+echo "Regenerating package index..."
+(cd "${PACKAGES_DIR}" && dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz)
+
+echo "Done. Packages in ${PACKAGES_DIR}/:"
+find "${PACKAGES_DIR}" -maxdepth 1 -name '*.deb' -printf '  %f\n' | sort

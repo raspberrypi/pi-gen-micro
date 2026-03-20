@@ -1,3 +1,33 @@
+pi-gen-micro (0.6.0) trixie; urgency=medium
+
+  * Major ergonomics and structural overhaul
+  * Add --help, --list-configurations, --list-packages CLI options
+  * Add input validation with helpful error messages for missing/invalid
+    configurations
+  * Add manpage (pi-gen-micro.1)
+  * Reorganise project layout: helper-packages/, internal/apt,
+    internal/prebuilts, internal/packages, internal/lib
+  * Add description files to configurations, description fields to
+    helper package nfpm.yaml
+  * Add build-packages tool to rebuild helper .deb packages from nfpm
+    sources
+  * Automatically rebuild helper packages at build time when nfpm is
+    available
+  * Refactor pi-gen-micro into sourced libraries: dpkg.sh, devices.sh,
+    init-systemd.sh, init-busybox.sh
+  * Add SYSTEMD=0 component flag for busybox init alternative (inittab,
+    rcS, udhcpc networking)
+  * Replace device target if-chain with case-based dispatch and shared
+    overlay helpers
+  * Extract networking setup into install_networking with init-specific
+    implementations
+  * Fix cryptkey-fetch-otp: return -> exit for standalone execution
+  * Fix command injection in generic_delete.list processing
+  * Document configuration system, helper packages, and target devices
+    in README
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Fri, 20 Mar 2026 14:43:58 +0000
+
 pi-gen-micro (0.5.1) trixie; urgency=medium
 
   [ Tom Dewey ]

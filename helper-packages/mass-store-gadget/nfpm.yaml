@@ -10,6 +10,12 @@ section: "default"
 priority: "extra"
 maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
 
+description: |
+  Configures the Raspberry Pi as a USB mass storage gadget, exposing attached
+  storage devices (eMMC, NVMe, SD, USB) to a connected host machine. Also
+  provides a USB serial console via ACM. Useful for flashing or imaging
+  devices over USB.
+
 contents:
 - src: ./configure-gadgets
   dst: /usr/bin/configure-gadgets

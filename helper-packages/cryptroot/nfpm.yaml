@@ -11,6 +11,12 @@ priority: "extra"
 
 maintainer: "Richard Oliver <richard.oliver@raspberrypi.com>"
 
+description: |
+  Init script and systemd service for booting into a LUKS-encrypted root
+  filesystem. Unlocks the root partition using a key from cryptkey-rpifwcrypto
+  (preferred) or cryptkey-fetch-otp (fallback), mounts the root and boot
+  partitions, and pivots into the real root using systemctl switch-root.
+
 depends:
   - cryptsetup-bin
   - libgcc-s1

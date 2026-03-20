@@ -87,7 +87,7 @@ read_key
 echo "${READ_KEY}" | xxd -r -p | base64 -w0
 
 if [ -z "$(echo "${READ_KEY}" | sed s/0//g)" ]; then
-    return 1
+    exit 1
 else
-    return 0
+    exit 0
 fi

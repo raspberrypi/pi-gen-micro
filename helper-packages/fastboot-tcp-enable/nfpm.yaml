@@ -8,6 +8,11 @@ section: "default"
 priority: "extra"
 maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
 
+description: |
+  Systemd service that runs rpi-fastbootd in TCP mode for network-based
+  device provisioning. Starts after network-online.target and restarts
+  automatically on failure.
+
 depends:
   - rpi-fastbootd (>= 14)
 

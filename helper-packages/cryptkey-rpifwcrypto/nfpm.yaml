@@ -11,7 +11,12 @@ priority: "extra"
 
 maintainer: "Tom Dewey <tom.dewey@raspberrypi.com>"
 
-description: "Cryptographic key fetcher using rpifwcrypto HMAC of MMC CID"
+description: |
+  Generates a device-bound cryptographic key by computing an HMAC of the block
+  device's unique identifier (CID for MMC/SD, EUI for NVMe, or serial) using
+  the Raspberry Pi firmware crypto hardware key slot. Used by cryptroot as the
+  primary key source. Requires rpifwcrypto and block-device-id packages.
+  USB devices are not supported.
 
 depends: 
   - busybox | coreutils

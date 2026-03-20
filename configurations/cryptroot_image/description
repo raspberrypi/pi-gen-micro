@@ -1,0 +1,1 @@
+Boots into a LUKS-encrypted root filesystem using hardware-derived or OTP-stored keys.

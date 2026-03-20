@@ -58,12 +58,12 @@ VERSION="$(get_dctrl_field ${PACKAGES_FILE} ${REQUESTED_PACKAGE} Version)"
 #then
 #fi
 PACKAGE_URL="$(grep-dctrl --field=Package --exact-match ${REQUESTED_PACKAGE} ${PACKAGES_FILE} --show-field Filename -n)"
-wget "${REPOSITORY}/${PACKAGE_URL}" -O "packages/${REQUESTED_PACKAGE}_${VERSION}.udeb"  -q
+wget "${REPOSITORY}/${PACKAGE_URL}" -O "internal/packages/${REQUESTED_PACKAGE}_${VERSION}.udeb"  -q
 
 
 ## Cleanup
 rm "${PACKAGES_GZ_FILE}"
-echo "packages/${REQUESTED_PACKAGE}_${VERSION}.udeb"
+echo "internal/packages/${REQUESTED_PACKAGE}_${VERSION}.udeb"
 #REQUESTED_PACKAGE_PARTIAL_URL="$(get_dctrl_field ${REQUESTED_PACKAGE_INFO_FILE} ${REQUESTED_PACKAGE} Filename)"
 #REQUESTED_PACKAGE_URL="${REPOSITORY}/${REQUESTED_PACKAGE_PARTIAL_URL}"
 #REQUESTED_PACKAGE_FILE="$(basename ${REQUESTED_PACKAGE_PARTIAL_URL})"

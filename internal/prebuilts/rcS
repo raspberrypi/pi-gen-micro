@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# Mount pseudo-filesystems
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts
+mount -t devpts devpts /dev/pts
+
+# Load kernel modules
+if [ -x /usr/local/bin/load_modules ]; then
+    /usr/local/bin/load_modules
+fi
+
+# Start udev if available
+if [ -x /sbin/udevd ]; then
+    /sbin/udevd --daemon
+    udevadm trigger
+    udevadm settle
+fi
+
+# Networking
+if [ -x /etc/init.d/network ]; then
+    /etc/init.d/network
+fi
+
+# Start services
+for svc in /etc/init.d/services.d/*; do
+    [ -x "$svc" ] && "$svc" &
+done

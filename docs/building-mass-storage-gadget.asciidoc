@@ -12,11 +12,11 @@ You will be greeted by a screen, that should contain an empty table, and a butto
 
 The configuration screen will initialise with two tables visible. The table on the left shows the components that you are adding to the image, the table on the right shows the build parameters that `pi-gen-micro` will use.
 
-`mass-storage-gadget` is created by installing a debian package into the build. The debian package has been prebuilt for you, and can be found in the `packages/` folder. To direct `pi-gen-micro`  to consume this package into the build, we will click on the `add .deb files` button. 
+`mass-storage-gadget` is created by installing a debian package into the build. The debian package has been prebuilt for you, and can be found in the `internal/packages/` folder. To direct `pi-gen-micro`  to consume this package into the build, we will click on the `add .deb files` button. 
 
 A dialog will then appear, with a text entry box. In this enter the path of the debian package. The path root defaults to being from wherever `pi-gen-micro`  is installed (e.g. `/home/pi/pi-gen-micro/`), but you can also use out of tree packages by specifying an absolute path (e.g `/home/pi/Downloads/package.deb`).
 
-Here we want to enter `packages/mass-storage-gadget_1.0.0_arm64.deb`. To add the package to be staged, click `add`. You should now observe that in the `Additional Components` table, that a new entry has appeared: `"DEBIAN: packages/mass-storage-gadget_1.0.0_arm64.deb"`. This indicates that `pi-gen-micro`  will take the debian package and install that into the build image.
+Here we want to enter `internal/packages/mass-storage-gadget_1.0.0_arm64.deb`. To add the package to be staged, click `add`. You should now observe that in the `Additional Components` table, that a new entry has appeared: `"DEBIAN: internal/packages/mass-storage-gadget_1.0.0_arm64.deb"`. This indicates that `pi-gen-micro`  will take the debian package and install that into the build image.
 
 This is the first step done, click the `save` button to save the staged changes.
 
@@ -34,7 +34,7 @@ For the `mass-storage-gadget`, we will want to enable `ssh` to check that everyt
 
 Click on Save Components List to stage the list, and return back to the main screen. You should observe that the `Additional Components` now contains a new line `INCLUDE-COMPONENT: SSH`. This indicates that SSH will be installed and setup into the image.
 
-You will also need to insert your public SSH key into `prebuilts/authorized_keys`, which `pi-gen-micro` will copy into the image.
+You will also need to insert your public SSH key into `internal/prebuilts/authorized_keys`, which `pi-gen-micro` will copy into the image.
 
 === Step 4 - Saving the configuration
 
