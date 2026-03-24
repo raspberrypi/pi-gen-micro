@@ -1,0 +1,12 @@
+Package: cryptkey-fetch-otp
+Architecture: arm64
+Maintainer: Richard Oliver <richard.oliver@raspberrypi.com>
+Depends: busybox | coreutils, xxd, raspi-utils-core
+Section: misc
+Priority: optional
+Description: Read private key from Raspberry Pi OTP memory
+ Reads a private key from the Raspberry Pi OTP (one-time programmable)
+ memory via vcmailbox. Used by cryptroot as a fallback key source when
+ cryptkey-rpifwcrypto is unavailable. Supports BCM2711 and BCM2712 chips.
+ Note: OTP rows are visible to any user in the 'video' group, so this is
+ only suitable for key storage when signed boot is enabled.

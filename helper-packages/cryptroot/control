@@ -1,0 +1,11 @@
+Package: cryptroot-package
+Architecture: arm64
+Maintainer: Richard Oliver <richard.oliver@raspberrypi.com>
+Depends: cryptsetup-bin, libgcc-s1, cryptkey-fetch-otp
+Recommends: cryptkey-rpifwcrypto
+Section: misc
+Priority: optional
+Description: Init script and systemd service for LUKS-encrypted root
+ Unlocks the root partition using a key from cryptkey-rpifwcrypto
+ (preferred) or cryptkey-fetch-otp (fallback), mounts the root and boot
+ partitions, and pivots into the real root using systemctl switch-root.

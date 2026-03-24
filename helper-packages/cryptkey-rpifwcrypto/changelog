@@ -1,0 +1,5 @@
+cryptkey-rpifwcrypto (1.0.1) unstable; urgency=medium
+
+  * Initial packaged release.
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Thu, 20 Mar 2026 15:37:00 +0000

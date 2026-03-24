@@ -1,0 +1,2 @@
+ssh_service /usr/local/bin 0755
+ssh.service /etc/systemd/system 0644

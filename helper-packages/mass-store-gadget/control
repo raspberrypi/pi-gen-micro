@@ -1,0 +1,10 @@
+Package: mass-storage-gadget
+Architecture: arm64
+Maintainer: Tom Dewey <tom.dewey@raspberrypi.com>
+Section: misc
+Priority: optional
+Description: USB mass storage gadget configuration
+ Configures the Raspberry Pi as a USB mass storage gadget, exposing
+ attached storage devices (eMMC, NVMe, SD, USB) to a connected host
+ machine. Also provides a USB serial console via ACM. Useful for
+ flashing or imaging devices over USB.

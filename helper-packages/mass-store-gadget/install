@@ -1,0 +1,3 @@
+configure-gadgets /usr/bin 0755
+systemd-mass-storage-gadget.service /etc/systemd/system 0644
+mass-storage-gadget.conf /etc/modules-load.d 0644
