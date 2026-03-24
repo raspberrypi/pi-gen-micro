@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Systemd init path
 # Sourced by pi-gen-micro — not executable on its own.
 # Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, SSH, NETWORK
