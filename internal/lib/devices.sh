@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Device target table: maps target name -> dtbs, overlays, and firmware
 # Sourced by pi-gen-micro — not executable on its own.
 # Expects: KPKG_EXTRACT, KERNEL_VERSION_STR, OUT_DIR to be set by the caller.

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Dpkg/apt helper functions
 # Sourced by pi-gen-micro — not executable on its own.
 # Expects: ROOTFS_DIR, DPKG_EXTRA_ARGS to be set by the caller.
