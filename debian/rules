@@ -5,6 +5,5 @@
 
 override_dh_auto_build:
 	dh_auto_build
-	mkdir -p internal/packages
-	cd internal/packages && dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
+	HELPER_PACKAGES_DIR=helper-packages PACKAGES_DIR=internal/packages ./build-packages
 

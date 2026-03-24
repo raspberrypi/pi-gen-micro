@@ -1,0 +1,5 @@
+cryptkey-fetch-otp (1.0.0) unstable; urgency=medium
+
+  * Initial packaged release.
+
+ -- Richard Oliver <richard.oliver@raspberrypi.com>  Thu, 20 Mar 2026 15:37:00 +0000

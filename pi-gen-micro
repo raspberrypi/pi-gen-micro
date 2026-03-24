@@ -34,21 +34,11 @@ list_configurations() {
 }
 
 list_helper_packages() {
-    find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name nfpm.yaml -printf '%h\n' 2>/dev/null | sort | while read -r dir; do
+    find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name control -printf '%h\n' 2>/dev/null | sort | while read -r dir; do
         name="$(basename "$dir")"
-        version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$dir/nfpm.yaml")"
-        pkg_name="$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$dir/nfpm.yaml")"
-        desc="$(awk '
-            /^description:/ { reading=1; next }
-            reading && /^[^ ]/ { exit }
-            reading { gsub(/^ +/, ""); buf = buf (buf ? " " : "") $0 }
-            END {
-                if (match(buf, /\. |\.$/))
-                    print substr(buf, 1, RSTART)
-                else
-                    print buf
-            }
-        ' "$dir/nfpm.yaml")"
+        pkg_name="$(sed -n 's/^Package: *//p' "$dir/control")"
+        version="$(dpkg-parsechangelog -l "$dir/changelog" -S Version)"
+        desc="$(sed -n 's/^Description: *//p' "$dir/control")"
         printf "  %-30s %s  (%s/)\n" "$pkg_name" "$version" "$name"
         if [ -n "$desc" ]; then
             printf "    %s\n" "$desc"
@@ -221,13 +211,11 @@ prepare_build_env() {
   export APT_CONFIG=$PWD/apt.cfg
   DPKG_EXTRA_ARGS="$(sed '/^#/d;s/^/--/' "${CONFIGURATION_FOLDER}"/dpkg_extra_args | xargs)"
 
-  # Rebuild helper packages from source if nfpm is available
+  # Build helper packages from source
   PACKAGES_DIR="$(dirname "${CONFIGURATION_ROOT}")/internal/packages"
-  if command -v nfpm >/dev/null 2>&1 && [ -d "${HELPER_PACKAGES_DIR}" ]; then
-    echo "Rebuilding helper packages..."
+  if [ -d "${HELPER_PACKAGES_DIR}" ]; then
+    echo "Building helper packages..."
     HELPER_PACKAGES_DIR="${HELPER_PACKAGES_DIR}" PACKAGES_DIR="${PACKAGES_DIR}" build-packages
-  else
-    echo "nfpm not found, using pre-built packages"
   fi
 
   apt-get update

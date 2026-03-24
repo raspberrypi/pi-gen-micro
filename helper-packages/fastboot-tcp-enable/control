@@ -1,0 +1,9 @@
+Package: fastboot-tcp
+Architecture: arm64
+Maintainer: Tom Dewey <tom.dewey@raspberrypi.com>
+Depends: rpi-fastbootd (>= 14)
+Section: misc
+Priority: optional
+Description: Systemd service for fastboot over TCP
+ Runs rpi-fastbootd in TCP mode for network-based device provisioning.
+ Starts after network-online.target and restarts automatically on failure.

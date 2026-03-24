@@ -2,3 +2,12 @@ debian/pi-gen-micro**
 debian/.debhelper**
 debian/files
 debian/debhelper-build-stamp
+
+# Built helper packages and index (rebuilt from source at build time)
+internal/packages/Packages.gz
+internal/packages/cryptkey-fetch-otp_*.deb
+internal/packages/cryptkey-rpifwcrypto_*.deb
+internal/packages/cryptroot-package_*.deb
+internal/packages/dropbear-ssh-service_*.deb
+internal/packages/fastboot-tcp_*.deb
+internal/packages/mass-storage-gadget_*.deb

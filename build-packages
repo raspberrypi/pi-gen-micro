@@ -9,8 +9,8 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [options] [package_dir ...]
 
-Build helper .deb packages from nfpm.yaml definitions and regenerate
-the local package index.
+Build helper .deb packages from control/install definitions and
+regenerate the local package index.
 
 With no arguments, rebuilds all packages found under HELPER_PACKAGES_DIR.
 With arguments, builds only the specified package directories.
@@ -35,7 +35,7 @@ EOF
 }
 
 list_package_names() {
-    find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name nfpm.yaml -printf '%h\n' | sort | while read -r dir; do
+    find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name control -printf '%h\n' | sort | while read -r dir; do
         printf "  %s\n" "$(basename "$dir")"
     done
 }
@@ -52,23 +52,18 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-if ! command -v nfpm >/dev/null 2>&1; then
-    echo "Error: nfpm is not installed. Install it from https://nfpm.goreleaser.com" >&2
-    exit 1
-fi
-
 # Find package directories to build
 PACKAGE_DIRS=()
 if [ ${#TARGETS[@]} -eq 0 ]; then
     while IFS= read -r dir; do
         PACKAGE_DIRS+=("$dir")
-    done < <(find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name nfpm.yaml -printf '%h\n' | sort)
+    done < <(find "${HELPER_PACKAGES_DIR}" -maxdepth 2 -name control -printf '%h\n' | sort)
 else
     for target in "${TARGETS[@]}"; do
         target="${target%/}"
         dir="${HELPER_PACKAGES_DIR}/${target}"
-        if [ ! -f "${dir}/nfpm.yaml" ]; then
-            echo "Error: No nfpm.yaml found in ${target}/" >&2
+        if [ ! -f "${dir}/control" ]; then
+            echo "Error: No control file found in ${target}/" >&2
             echo "Available packages:" >&2
             list_package_names >&2
             exit 1
@@ -86,24 +81,49 @@ mkdir -p "${PACKAGES_DIR}"
 
 for dir in "${PACKAGE_DIRS[@]}"; do
     name="$(basename "$dir")"
-    pkg_name="$(sed -n 's/^name: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$dir/nfpm.yaml")"
-    version="$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/p' "$dir/nfpm.yaml")"
+    pkg_name="$(sed -n 's/^Package: *//p' "$dir/control")"
+    version="$(dpkg-parsechangelog -l "$dir/changelog" -S Version)"
+    arch="$(sed -n 's/^Architecture: *//p' "$dir/control")"
 
     if [ "$DRY_RUN" -eq 1 ]; then
-        echo "[dry-run] Would build: ${pkg_name}_${version}_arm64.deb from ${name}/"
+        echo "[dry-run] Would build: ${pkg_name}_${version}_${arch}.deb from ${name}/"
         continue
     fi
 
     echo "Building ${pkg_name} ${version} from ${name}/"
 
     # Remove any previous version of this package
-    rm -f "${PACKAGES_DIR}/${pkg_name}_"*_arm64.deb
+    rm -f "${PACKAGES_DIR}/${pkg_name}_"*".deb"
 
-    # Run nfpm from the package directory so relative src: paths resolve
-    (cd "$dir" && nfpm package \
-        --config nfpm.yaml \
-        --packager deb \
-        --target "${PACKAGES_DIR}/")
+    # Create staging directory
+    staging="$(mktemp -d)"
+
+    mkdir -p "$staging/DEBIAN"
+    # Inject version from changelog into control
+    sed "1a\\
+Version: ${version}" "$dir/control" > "$staging/DEBIAN/control"
+
+    # Process install manifest: <src> <dest-dir> <mode>
+    while read -r src dest mode; do
+        [ -z "$src" ] && continue
+        mkdir -p "$staging$dest"
+        cp "$dir/$src" "$staging$dest/$src"
+        chmod "${mode:-0644}" "$staging$dest/$src"
+    done < "$dir/install"
+
+    # Process symlinks: <target> <link-path>
+    if [ -f "$dir/links" ]; then
+        while read -r target link_path; do
+            [ -z "$target" ] && continue
+            mkdir -p "$staging$(dirname "$link_path")"
+            ln -s "$target" "$staging$link_path"
+        done < "$dir/links"
+    fi
+
+    dpkg-deb --root-owner-group --build "$staging" \
+        "${PACKAGES_DIR}/${pkg_name}_${version}_${arch}.deb"
+
+    rm -rf "$staging"
 done
 
 if [ "$DRY_RUN" -eq 1 ]; then

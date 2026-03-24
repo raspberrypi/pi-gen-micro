@@ -1,0 +1,2 @@
+init_cryptroot.sh /usr/bin 0755
+cryptroot.service /etc/systemd/system 0644

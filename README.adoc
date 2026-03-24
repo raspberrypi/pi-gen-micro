@@ -94,17 +94,15 @@ Create a new directory under the configurations path (default: `/var/lib/pi-gen-
 
 pi-gen-micro includes a local package repository at `/var/lib/pi-gen-micro/internal/packages/`. Configurations install packages from this repository (alongside standard Debian and Raspberry Pi OS repositories) by listing them in their `packages.list`.
 
-The source for each helper package lives under `helper-packages/` (installed to `/var/lib/pi-gen-micro/helper-packages/`). Each is a directory containing an `nfpm.yaml` and the files to package.
+The source for each helper package lives under `helper-packages/` (installed to `/var/lib/pi-gen-micro/helper-packages/`). Each is a directory containing a `control` file (binary package metadata), an `install` file (file-to-destination mappings with permissions), and optionally a `links` file (symlinks).
 
-=== Automatic rebuilding
+=== Automatic building
 
-When `pi-gen-micro` runs, it checks whether `nfpm` is installed. If so, it automatically rebuilds all helper packages from source and regenerates the package index before the build starts. This means edits to helper package sources take effect on the next `pi-gen-micro` run with no manual steps.
-
-If `nfpm` is not installed, the pre-built `.deb` files in `internal/packages/` are used as-is.
+When `pi-gen-micro` runs, it automatically builds all helper packages from source using `dpkg-deb` and regenerates the package index before the build starts. This means edits to helper package sources take effect on the next `pi-gen-micro` run with no manual steps.
 
 === Included helper packages
 
-Each helper package has a full description in its `nfpm.yaml` file. To list all available packages with their descriptions:
+Each helper package has a full description in its `control` file. To list all available packages with their descriptions:
 
 ```
 pi-gen-micro --list-packages
@@ -125,19 +123,19 @@ build-packages cryptroot ssh-service  # rebuild specific packages only
 === Adding a new helper package
 
 1. Create a directory under `helper-packages/` (e.g. `helper-packages/my-package/`).
-2. Add the files to be packaged and an `nfpm.yaml` describing the package. See https://nfpm.goreleaser.com/configuration for the full nfpm configuration reference.
+2. Add the files to be packaged, a `control` file (standard Debian binary package control format), an `install` file (lines of `<source> <dest-dir> <mode>`), and optionally a `links` file (lines of `<target> <link-path>`).
 3. Add the directory to `debian/install` so it is installed under `/var/lib/pi-gen-micro/helper-packages/`:
 +
 ```
 helper-packages/my-package          /var/lib/pi-gen-micro/helper-packages
 ```
-4. Reference the package name (from `nfpm.yaml`, not the directory name) in your configuration's `packages.list`.
+4. Reference the package name (from `control`, not the directory name) in your configuration's `packages.list`.
 
 The package will be built automatically on the next `pi-gen-micro` run.
 
 === Adding external pre-built packages
 
-To include a `.deb` not built from an nfpm source (e.g. `rpi-fastbootd`, `rpi-imager-embedded`):
+To include a `.deb` not built from a helper package source (e.g. `rpi-fastbootd`, `rpi-imager-embedded`):
 
 1. Place the `.deb` file in the `internal/packages/` directory.
 2. Regenerate the package index:
@@ -148,4 +146,4 @@ dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
 ```
 3. Reference the package name in your configuration's `packages.list`.
 
-NOTE: `build-packages` does not touch `.deb` files that lack a corresponding nfpm source, so externally-provided packages are preserved across rebuilds.
+NOTE: `build-packages` does not touch `.deb` files that lack a corresponding helper package source, so externally-provided packages are preserved across rebuilds.

@@ -1,0 +1,9 @@
+Package: dropbear-ssh-service
+Architecture: arm64
+Maintainer: Tom Dewey <tom.dewey@raspberrypi.com>
+Section: misc
+Priority: optional
+Description: Lightweight SSH server using dropbear
+ Generates host keys on first boot and runs dropbear in the foreground
+ as a systemd service. Requires an authorized_keys file to be
+ pre-populated in the image for access.

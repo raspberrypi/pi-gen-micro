@@ -66,9 +66,9 @@ file in each configuration directory.
 .B \-\-list\-packages
 List available helper packages with their descriptions and exit.
 Descriptions are read from the
-.I description
+.I Description
 field in each package's
-.I nfpm.yaml
+.I control
 file.
 .SH CONFIGURATIONS
 A configuration is a directory containing files that define what goes into the
@@ -186,24 +186,30 @@ ships with a local APT repository at
 .IR /var/lib/pi\-gen\-micro/internal/packages/ .
 Package sources live under
 .IR /var/lib/pi\-gen\-micro/helper\-packages/ ,
-each containing an
-.I nfpm.yaml
-and the files to package.
+each containing a
+.I control
+file (binary package metadata),
+an
+.I install
+file (file mappings), and optionally a
+.I links
+file (symlinks).
 .PP
-If
-.BR nfpm (1)
-is installed, all helper packages are automatically rebuilt from source at the
-start of each build. Otherwise, pre-built
-.I .deb
-files are used.
+All helper packages are automatically built from source at the
+start of each build using
+.BR dpkg\-deb (1).
 .PP
 Run
 .B pi\-gen\-micro \-\-list\-packages
 to see available helper packages and their descriptions.
 .PP
-To add a new helper package, create a directory with an
-.I nfpm.yaml
-and add it to
+To add a new helper package, create a directory with a
+.I control
+file,
+.I install
+file, and optionally a
+.I links
+file, then add it to
 .I debian/install
 under
 .IR /var/lib/pi\-gen\-micro/helper\-packages/ .
@@ -212,7 +218,7 @@ Reference the package name in a configuration's
 .PP
 External
 .I .deb
-files not built from nfpm sources can be placed directly in the
+files not built from helper package sources can be placed directly in the
 .I internal/packages/
 directory. After adding or removing external packages, regenerate the index:
 .PP
@@ -271,7 +277,7 @@ pi\-gen\-micro \-\-list\-packages
 Built-in configuration directories.
 .TP
 .I /var/lib/pi\-gen\-micro/helper\-packages/
-Source directories for helper packages (nfpm definitions).
+Source directories for helper packages (control/install/links definitions).
 .TP
 .I /var/lib/pi\-gen\-micro/internal/packages/
 Local APT repository containing helper
@@ -285,7 +291,7 @@ APT and dpkg configuration used during image builds.
 Pre-built files copied into images (config.txt, cmdline.txt, passwd, etc.).
 .SH SEE ALSO
 .BR build\-packages (1),
-.BR nfpm (1),
+.BR dpkg\-deb (1),
 .BR dpkg (1),
 .BR fakeroot (1),
 .BR rpi\-make\-boot\-image (1)
