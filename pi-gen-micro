@@ -211,8 +211,11 @@ prepare_build_env() {
   export APT_CONFIG=$PWD/apt.cfg
   DPKG_EXTRA_ARGS="$(sed '/^#/d;s/^/--/' "${CONFIGURATION_FOLDER}"/dpkg_extra_args | xargs)"
 
-  # Build helper packages from source
-  PACKAGES_DIR="$(dirname "${CONFIGURATION_ROOT}")/internal/packages"
+  # Copy shipped packages to a writable build-local directory and rebuild
+  # helper packages there (the installed directory is root-owned).
+  PACKAGES_DIR="${PWD}/packages"
+  rsync --archive "$(dirname "${CONFIGURATION_ROOT}")/internal/packages/" "${PACKAGES_DIR}/"
+  sed -i "s|file:.*/internal/packages|file:${PACKAGES_DIR}|" apt/sources.list.d/pi-gen-micro.list
   if [ -d "${HELPER_PACKAGES_DIR}" ]; then
     echo "Building helper packages..."
     HELPER_PACKAGES_DIR="${HELPER_PACKAGES_DIR}" PACKAGES_DIR="${PACKAGES_DIR}" build-packages
