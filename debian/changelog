@@ -1,3 +1,9 @@
+pi-gen-micro (0.6.1) trixie; urgency=medium
+
+  * bash-completion: Fix completions for new project structure
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Thu, 26 Mar 2026 15:23:28 +0000
+
 pi-gen-micro (0.6.0) trixie; urgency=medium
 
   * Major ergonomics and structural overhaul
