@@ -1,20 +1,21 @@
-function complete_pi-gen-micro() {
-    if [ "${#COMP_WORDS[@]}" != "2" ]; then
-        return
-    fi
+#shellcheck shell=bash
 
-    local PGM_CONFS="$( \
-        echo $( \
-            find \
-                /var/lib/pi-gen-micro/configurations \
-                -mindepth 1 \
-                -maxdepth 1 \
-                -type d \
-                -printf '%P\n' \
-        ) \
-    )"
+_complete_pi_gen_micro() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local conf_root="${CONFIGURATION_ROOT:-/var/lib/pi-gen-micro/configurations/}"
+    local devices="pi3 cm3 pi4 400 cm4 pi5 500 cm5 02W"
 
-    COMPREPLY=($(compgen -W "${PGM_CONFS}" -- "${COMP_WORDS[1]}"))
+    case "$COMP_CWORD" in
+        1)
+            local opts="--help --list-configurations --list-packages"
+            local confs
+            confs="$(find "$conf_root" -mindepth 1 -maxdepth 1 -type d -printf '%P\n' 2>/dev/null)"
+            mapfile -t COMPREPLY < <(compgen -W "${opts} ${confs}" -- "$cur")
+            ;;
+        2)
+            mapfile -t COMPREPLY < <(compgen -W "${devices}" -- "$cur")
+            ;;
+    esac
 }
 
-complete -F complete_pi-gen-micro pi-gen-micro
+complete -F _complete_pi_gen_micro pi-gen-micro
