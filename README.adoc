@@ -138,12 +138,6 @@ The package will be built automatically on the next `pi-gen-micro` run.
 To include a `.deb` not built from a helper package source (e.g. `rpi-fastbootd`, `rpi-imager-embedded`):
 
 1. Place the `.deb` file in the `internal/packages/` directory.
-2. Regenerate the package index:
-+
-```
-cd internal/packages
-dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz
-```
-3. Reference the package name in your configuration's `packages.list`.
+2. Reference the package name in your configuration's `packages.list`.
 
-NOTE: `build-packages` does not touch `.deb` files that lack a corresponding helper package source, so externally-provided packages are preserved across rebuilds.
+The package index is regenerated automatically when `build-packages` runs (which happens at the start of every `pi-gen-micro` build), so no manual steps are needed. `build-packages` does not touch `.deb` files that lack a corresponding helper package source, so externally-provided packages are preserved across rebuilds.
