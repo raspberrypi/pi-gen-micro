@@ -369,7 +369,7 @@ configure_system() {
     # Installed perl to help udev postinst, however don't need in final image
     rm -rf build/usr/lib/aarch64-linux-gnu/perl-base
     rm -rf build/usr/bin/perl
-    rm -rf build/usr/bin/perl5.36.0
+    rm -f build/usr/bin/perl5.*
   fi
 
   if [ "$USES_CUSTOM_LOGO" = 1 ]; then
