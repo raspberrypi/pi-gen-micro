@@ -78,6 +78,7 @@ Each configuration directory contains:
 
 Optional files:
   cmdline.txt            Custom kernel command line (overrides default)
+  config.txt             Custom firmware configuration (overrides default)
   post_creation.sh       Script run after image assembly
   udebs.list             Additional udeb substitute packages to install
   delete.list            Paths to delete from the final image
@@ -468,6 +469,10 @@ prepare_kernel_and_firmware() {
 
   if [ -f "${CONFIGURATION_FOLDER}/cmdline.txt" ]; then
     cp "${CONFIGURATION_FOLDER}/cmdline.txt" "${OUT_DIR}"/cmdline.txt
+  fi
+
+  if [ -f "${CONFIGURATION_FOLDER}/config.txt" ]; then
+    cp "${CONFIGURATION_FOLDER}/config.txt" "${OUT_DIR}"/config.txt
   fi
 
   # Install device-specific files
