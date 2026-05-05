@@ -82,6 +82,8 @@ Create a new directory under the configurations path (default: `/var/lib/pi-gen-
 
 `cmdline.txt`:: Custom kernel command line, overriding the default from prebuilts.
 
+`config.txt`:: Custom firmware configuration, overriding the default from prebuilts.
+
 `post_creation.sh`:: Executable script run after the full image is assembled. Useful for cleanup or additional modifications.
 
 `udebs.list`:: Newline-separated list of udeb packages to install as substitute packages (patched with `Provides`/`Replaces`/`Conflicts` to satisfy dependencies).
