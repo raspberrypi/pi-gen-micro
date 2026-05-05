@@ -1,6 +1,6 @@
 # Busybox init path
 # Sourced by pi-gen-micro — not executable on its own.
-# Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, SSH, NETWORK
+# Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, SSH, NETWORK, NETWORK_BASIC
 
 install_init_packages() {
   # busybox init: invoked as PID 1 it reads /etc/inittab
@@ -40,6 +40,17 @@ nameserver 8.8.4.4
   mkdir -p build/etc/ssl/certs/
   cp -r /etc/ssl/certs/* build/etc/ssl/certs/
   cp /etc/ca-certificates.conf build/etc/ca-certificates.conf
+}
+
+install_networking_basic() {
+  # Minimal: link up + DHCP, no /etc/resolv.conf and no CA trust store copy.
+  echo "Installing networking (busybox, basic)"
+  mkdir -p build/usr/share/udhcpc
+  cp "${PREBUILTS_DIR}"/network.script build/usr/share/udhcpc/default.script
+  chmod +x build/usr/share/udhcpc/default.script
+  mkdir -p build/etc/init.d
+  cp "${PREBUILTS_DIR}"/network_init.sh build/etc/init.d/network
+  chmod +x build/etc/init.d/network
 }
 
 configure_init_ssh() {

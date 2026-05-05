@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Systemd init path
 # Sourced by pi-gen-micro — not executable on its own.
-# Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, SSH, NETWORK
+# Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, SSH, NETWORK, NETWORK_BASIC
 
 install_init_packages() {
   # TODO: postinst failure, fstrim settings using deb-systemd-helper
@@ -88,6 +88,25 @@ nameserver 8.8.4.4
   ln -s /lib/systemd/system/systemd-network-generator.service build/etc/systemd/system/sysinit.target.wants/systemd-network-generator.service
   mkdir -p build/etc/systemd/system/network-online.target.wants
   ln -s /lib/systemd/system/systemd-networkd-wait-online.service build/etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service
+}
+
+install_networking_basic() {
+  # Minimal networking: bring the link up, configure addresses, bind sockets.
+  # No DNS, no NTP, no CA trust store. For images whose only consumer is a
+  # daemon talking to the host on the local link (e.g. fastbootd over IPv6
+  # link-local).
+  echo "Installing & enabling networking (basic)"
+  cp "${PREBUILTS_DIR}"/20-wired.network build/etc/systemd/network/20-wired.network
+
+  mkdir -p build/etc/systemd/system/multi-user.target.wants
+  ln -s /lib/systemd/system/systemd-networkd.service \
+    build/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
+  mkdir -p build/etc/systemd/system/sockets.target.wants
+  ln -s /lib/systemd/system/systemd-networkd.socket \
+    build/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
+  mkdir -p build/etc/systemd/system/sysinit.target.wants
+  ln -s /lib/systemd/system/systemd-network-generator.service \
+    build/etc/systemd/system/sysinit.target.wants/systemd-network-generator.service
 }
 
 configure_init_ssh() {

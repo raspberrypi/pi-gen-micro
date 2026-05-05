@@ -8,7 +8,6 @@ internal/packages                   /var/lib/pi-gen-micro/internal
 helper-packages/cryptroot                  /var/lib/pi-gen-micro/helper-packages
 helper-packages/cryptkey-fetch-otp         /var/lib/pi-gen-micro/helper-packages
 helper-packages/cryptkey-rpifwcrypto       /var/lib/pi-gen-micro/helper-packages
-helper-packages/fastboot-tcp-enable        /var/lib/pi-gen-micro/helper-packages
 helper-packages/mass-store-gadget          /var/lib/pi-gen-micro/helper-packages
 helper-packages/ssh-service                /var/lib/pi-gen-micro/helper-packages
 pi-gen-micro.1                      /usr/share/man/man1

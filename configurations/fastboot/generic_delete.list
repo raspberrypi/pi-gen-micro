@@ -1,0 +1,2 @@
+# Berkeley DB — pulled by passwd/perl-base, no consumer in this image
+libdb-5.3.so

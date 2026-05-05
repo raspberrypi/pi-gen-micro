@@ -70,7 +70,7 @@ $(list_configurations)
 
 Each configuration directory contains:
   build.parameters       Build-time settings (kernel bit size, custom kernel, etc.)
-  components.parameters  Feature flags: SYSTEMD, SSH, UDEV, NETWORK, AUTOLOGIN
+  components.parameters  Feature flags: SYSTEMD, SSH, UDEV, NETWORK, NETWORK_BASIC, AUTOLOGIN
   packages.list          Additional packages to install into the image
   kernel_modules.list    Kernel modules to include in the image
   installer_scripts.list Script to run for post-install setup (executed, not sourced)
@@ -320,12 +320,21 @@ install_components() {
      apt_install "${package}"
   done
 
-  if [ "${NETWORK}" = 1 ]; then
+  if [ "${NETWORK}" = 1 ] && [ "${NETWORK_BASIC}" = 1 ]; then
+    echo "ERROR: NETWORK and NETWORK_BASIC are mutually exclusive." >&2
+    exit 1
+  fi
+
+  if [ "${NETWORK}" = 1 ] || [ "${NETWORK_BASIC}" = 1 ]; then
     if [ "${SYSTEMD}" != 0 ] && [ "${UDEV}" != 1 ]; then
       echo "ERROR: systemd networking requires UDEV support." >&2
       exit 1
     fi
-    install_networking
+    if [ "${NETWORK_BASIC}" = 1 ]; then
+      install_networking_basic
+    else
+      install_networking
+    fi
   fi
 }
 
