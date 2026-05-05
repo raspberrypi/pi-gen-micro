@@ -1,0 +1,40 @@
+# rpi-imager-embedded firmware configuration.
+#
+# Differs from the default prebuilt config.txt in two places — both are
+# required so a USB target drive plugged into the IO board enumerates as
+# host:
+#   * [cm4] enables otg_mode=1 to bring up the BCM2711 XHCI host controller.
+#   * [all] does NOT load the dwc2 peripheral overlay (the imager is not a
+#     USB gadget).
+
+dtparam=i2c_arm=on
+dtparam=spi=on
+dtparam=audio=on
+
+camera_auto_detect=1
+display_auto_detect=1
+
+dtoverlay=vc4-kms-v3d
+max_framebuffers=2
+
+disable_fw_kms_setup=1
+
+arm_64bit=1
+disable_overscan=1
+arm_boost=1
+
+gpu_mem_512=16
+
+[cm4]
+otg_mode=1
+
+[pi5]
+arm_freq=1000
+gpu_freq=500
+
+[all]
+kernel=zImage
+initramfs rootfs.cpio.zst
+dtparam=uart0=on
+enable_uart=1
+uart_2ndstage=1

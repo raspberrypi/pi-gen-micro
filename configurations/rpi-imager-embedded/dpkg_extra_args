@@ -9,3 +9,8 @@ path-exclude=/usr/share/lintian/*
 path-exclude=/usr/share/linda/*
 # Locales / Translations
 path-exclude=/usr/share/locale/*
+# Bash completion (no interactive shell on the embedded imager)
+path-exclude=/usr/share/bash-completion/*
+# Perl libraries are pulled in transitively but not used at runtime
+path-exclude=/usr/share/perl/*
+path-exclude=/usr/share/perl5/*
