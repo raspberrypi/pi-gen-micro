@@ -40,8 +40,8 @@ install_device_files() {
       install_pi4_overlays
       ;;
     pi4)
-      cp raspi-firmware/start4*.elf "${OUT_DIR}"/
-      cp raspi-firmware/fixup4*.dat "${OUT_DIR}"/
+      cp raspi-firmware/start4.elf "${OUT_DIR}"/
+      cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
       cp "$kimg"/broadcom/bcm2711-rpi-4-b.dtb "${OUT_DIR}"/
       install_pi4_overlays
       ;;
