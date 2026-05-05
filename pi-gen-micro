@@ -508,22 +508,32 @@ prepare_kernel_and_firmware() {
 package_image() {
   cd build
 
-  # Delete paths listed in delete.list
+  # Delete paths listed in delete.list. Comment (# …) and blank lines are
+  # ignored so authors can annotate without those tokens being treated as
+  # paths to remove.
   if [ -f "${CONFIGURATION_FOLDER}/delete.list" ]; then
-      IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/delete.list tr '\n' ', ')"
-      for entry in "${array[@]}"; do
+      while IFS= read -r entry || [ -n "$entry" ]; do
+        entry="${entry%%#*}"
+        entry="${entry#"${entry%%[![:space:]]*}"}"
+        entry="${entry%"${entry##*[![:space:]]}"}"
+        [ -z "${entry}" ] && continue
         echo "Deleting: ${entry}"
         rm -rf ${entry}
-      done
+      done < "${CONFIGURATION_FOLDER}/delete.list"
   fi
 
-  # Delete paths matching patterns in generic_delete.list
+  # Delete paths matching patterns in generic_delete.list. Same comment/blank
+  # handling as delete.list — accidental tokenisation of comment text matched
+  # things like 'aarch64-linux-gnu' via "*in*" and wiped libraries wholesale.
   if [ -f "${CONFIGURATION_FOLDER}/generic_delete.list" ]; then
-      IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/generic_delete.list tr '\n' ', ')"
-      for pattern in "${array[@]}"; do
+      while IFS= read -r pattern || [ -n "$pattern" ]; do
+        pattern="${pattern%%#*}"
+        pattern="${pattern#"${pattern%%[![:space:]]*}"}"
+        pattern="${pattern%"${pattern##*[![:space:]]}"}"
+        [ -z "${pattern}" ] && continue
         echo "Deleting: ${pattern}"
         find . -name "*${pattern}*" -exec rm -rf {} +
-      done
+      done < "${CONFIGURATION_FOLDER}/generic_delete.list"
   fi
 
   echo "Compressing & creating boot image"
