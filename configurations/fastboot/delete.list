@@ -1,0 +1,97 @@
+# Charset conversion tables — fastbootd is ASCII-clean
+usr/lib/aarch64-linux-gnu/gconv
+
+# udev hardware database — not consulted on this image
+usr/lib/udev/hwdb.d
+
+# PAM — no logins, no auth
+usr/lib/aarch64-linux-gnu/security
+usr/lib/pam.d
+etc/pam.conf
+etc/pam.d
+usr/share/pam
+usr/share/pam-configs
+
+# TPM PCR lock — unused
+usr/lib/systemd/systemd-pcrlock
+usr/lib/pcrlock.d
+usr/lib/systemd/system/systemd-pcrlock.service
+usr/lib/systemd/system/systemd-pcrlock-file-system.service
+usr/lib/systemd/system/systemd-pcrlock-firmware-code.service
+usr/lib/systemd/system/systemd-pcrlock-firmware-config.service
+usr/lib/systemd/system/systemd-pcrlock-machine-id.service
+usr/lib/systemd/system/systemd-pcrlock-make-policy.service
+usr/lib/systemd/system/systemd-pcrlock-secureboot-authority.service
+usr/lib/systemd/system/systemd-pcrlock-secureboot-policy.service
+
+# logind — no interactive logins on a fastboot gadget
+usr/lib/systemd/systemd-logind
+usr/lib/systemd/system/systemd-logind.service
+usr/lib/systemd/system/systemd-user-sessions.service
+usr/lib/systemd/system/user.slice
+usr/lib/systemd/system/user-runtime-dir@.service
+usr/lib/systemd/system/user@.service
+
+# polkit/dbus — no daemons running
+usr/share/polkit-1
+usr/share/dbus-1
+
+# Shell completions — shell is busybox sh
+usr/share/bash-completion
+usr/share/zsh
+
+# perl-base bin/lib was removed by pi-gen-micro; the share dir was missed
+usr/share/perl5
+usr/share/perl-base
+
+# Journal message catalog — no journalctl reader on device
+usr/lib/systemd/catalog
+
+# util-linux extras and coreutils that fastbootd never shells out to
+usr/bin/chage
+usr/bin/chfn
+usr/bin/csplit
+usr/bin/dir
+usr/bin/dmesg
+usr/bin/du
+usr/bin/expr
+usr/bin/factor
+usr/bin/gpasswd
+usr/bin/install
+usr/bin/ipcs
+usr/bin/localedef
+usr/bin/ls
+usr/bin/lscpu
+usr/bin/lsfd
+usr/bin/nl
+usr/bin/numfmt
+usr/bin/od
+usr/bin/partx
+usr/bin/pr
+usr/bin/ptx
+usr/bin/resizepart
+usr/bin/setpriv
+usr/bin/su
+usr/bin/tac
+usr/bin/tail
+usr/bin/tar
+usr/bin/taskset
+usr/bin/tee
+usr/bin/tr
+usr/bin/truncate
+usr/bin/tsort
+usr/bin/uclampset
+usr/bin/ulockmgr_server
+usr/bin/unexpand
+usr/bin/uniq
+usr/bin/unlink
+usr/bin/unshare
+usr/bin/utmpdump
+usr/bin/vdir
+usr/bin/wc
+usr/bin/wdctl
+usr/bin/whereis
+usr/bin/who
+usr/bin/whoami
+usr/bin/yes
+usr/bin/zdump

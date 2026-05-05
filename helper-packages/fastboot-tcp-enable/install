@@ -1,2 +1,0 @@
-run_fastboot_tcp /usr/bin 0755
-fastboot-tcp.service /etc/systemd/system 0644
