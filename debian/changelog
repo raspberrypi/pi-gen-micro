@@ -1,3 +1,22 @@
+pi-gen-micro (0.7.0) trixie; urgency=medium
+
+  * rpi-imager-embedded: Switch from AppImage to vendored .deb under
+    /opt/
+  * rpi-imager-embedded: Migrate to busybox init (drop systemd)
+  * rpi-imager-embedded: Drop FUSE, OpenSSL, and systemd dependencies
+  * rpi-imager-embedded: Add custom /init script with mdev and udhcpc
+  * rpi-imager-embedded: Upgrade to rpi-imager-embedded 2.0.9
+  * Add GETTY=0 component flag to suppress login prompt
+  * Add NETWORK_BASIC component for minimal systemd-networkd
+  * Fix udhcpc default.script to handle DNS and routing
+  * build-packages: Write Release file for local repo priority
+  * delete.list, generic_delete.list: Add comment and blank line support
+  * Drop kernel build metadata (config-*, System.map-*) from images
+  * Exclude extraneous Pi 4 firmware variants from targeted builds
+  * fastboot: Update to rpi-fastbootd 14.0.0, add GETTY=0
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Wed, 06 May 2026 18:05:18 +0100
+
 pi-gen-micro (0.6.1) trixie; urgency=medium
 
   * bash-completion: Fix completions for new project structure
