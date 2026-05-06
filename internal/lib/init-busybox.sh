@@ -1,6 +1,6 @@
 # Busybox init path
 # Sourced by pi-gen-micro — not executable on its own.
-# Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, SSH, NETWORK, NETWORK_BASIC
+# Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, GETTY, SSH, NETWORK, NETWORK_BASIC
 
 install_init_packages() {
   # busybox init: invoked as PID 1 it reads /etc/inittab
@@ -12,6 +12,12 @@ configure_init_services() {
   mkdir -p build/etc/init.d/services.d
   cp "${PREBUILTS_DIR}"/rcS build/etc/init.d/rcS
   chmod +x build/etc/init.d/rcS
+
+  # When GETTY=0, strip the console getty lines so no login prompt appears.
+  if [ "${GETTY}" = 0 ]; then
+    sed -i '/\/sbin\/getty/d' build/etc/inittab
+    return
+  fi
 
   if [ "${AUTOLOGIN}" = 1 ]; then
     sed -i 's|/sbin/getty 38400 tty1|/sbin/getty -n -l /bin/sh 38400 tty1|' build/etc/inittab

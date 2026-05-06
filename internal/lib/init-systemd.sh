@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Systemd init path
 # Sourced by pi-gen-micro — not executable on its own.
-# Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, SSH, NETWORK, NETWORK_BASIC
+# Expects: dpkg.sh functions, PREBUILTS_DIR, CONFIGURATION_FOLDER, UDEV, AUTOLOGIN, GETTY, SSH, NETWORK, NETWORK_BASIC
 
 install_init_packages() {
   # TODO: postinst failure, fstrim settings using deb-systemd-helper
@@ -19,6 +19,14 @@ configure_init_services() {
 ExecStart=
 ExecStart=/bin/true
 " > build/etc/systemd/system/getty-static.service.d/override.conf
+
+  # When GETTY=0, mask all getty services so the console retains kernel log
+  # output and no login prompt is displayed.
+  if [ "${GETTY}" = 0 ]; then
+    ln -s /dev/null build/etc/systemd/system/getty@.service
+    ln -s /dev/null build/etc/systemd/system/serial-getty@.service
+    return
+  fi
 
   # serial-getty waits for device unit (using udev) by default, disable this if
   # udev is not used. Always make a copy of serial-getty@.service in 'etc'.
