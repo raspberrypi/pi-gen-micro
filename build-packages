@@ -134,5 +134,10 @@ fi
 echo "Regenerating package index..."
 (cd "${PACKAGES_DIR}" && dpkg-scanpackages . /dev/null | gzip -9c > Packages.gz)
 
+# Write a Release file so the local repo matches Default-Release priority.
+cat > "${PACKAGES_DIR}/Release" << 'RELEASE_EOF'
+Suite: trixie
+RELEASE_EOF
+
 echo "Done. Packages in ${PACKAGES_DIR}/:"
 find "${PACKAGES_DIR}" -maxdepth 1 -name '*.deb' -printf '  %f\n' | sort
