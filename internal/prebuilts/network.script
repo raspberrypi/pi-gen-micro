@@ -1,3 +1,28 @@
 #!/bin/sh
-ifconfig $interface $ip
-echo "Set IP $ip on interface $interface"
+# udhcpc default.script — called by udhcpc on DHCP events.
+# Handles IP, routing, and DNS configuration.
+
+case "$1" in
+  deconfig)
+    ifconfig "$interface" 0.0.0.0
+    ;;
+  bound|renew)
+    ifconfig "$interface" "$ip" netmask "${subnet:-255.255.255.0}" ${broadcast:+broadcast "$broadcast"}
+
+    # Default route
+    if [ -n "$router" ]; then
+      while route del default gw 0.0.0.0 dev "$interface" 2>/dev/null; do :; done
+      for gw in $router; do
+        route add default gw "$gw" dev "$interface"
+      done
+    fi
+
+    # DNS
+    if [ -n "$dns" ]; then
+      : > /etc/resolv.conf
+      for ns in $dns; do
+        echo "nameserver $ns" >> /etc/resolv.conf
+      done
+    fi
+    ;;
+esac
