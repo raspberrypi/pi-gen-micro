@@ -4,6 +4,6 @@ libfuse2
 fuse
 libfontconfig1
 rpi-imager-embedded
-libssl3
 xkb-data-udeb
 libstdc++6
+libudev1
