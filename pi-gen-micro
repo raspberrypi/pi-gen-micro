@@ -70,7 +70,7 @@ $(list_configurations)
 
 Each configuration directory contains:
   build.parameters       Build-time settings (kernel bit size, custom kernel, etc.)
-  components.parameters  Feature flags: SYSTEMD, SSH, UDEV, NETWORK, NETWORK_BASIC, AUTOLOGIN
+  components.parameters  Feature flags: SYSTEMD, SSH, UDEV, NETWORK, NETWORK_BASIC, AUTOLOGIN, GETTY
   packages.list          Additional packages to install into the image
   kernel_modules.list    Kernel modules to include in the image
   installer_scripts.list Script to run for post-install setup (executed, not sourced)
