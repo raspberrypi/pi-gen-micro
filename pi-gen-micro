@@ -423,7 +423,7 @@ prepare_kernel_and_firmware() {
     KPKG_EXTRACT="${KERNEL_MODULES_DIR}"
   else
     KERNEL_META=linux-image-rpi-v8
-    KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
+    KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*' | grep -m1 '^linux-image-')
     apt_download "$KERNEL_PACKAGE"
     KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
     apt_download "${KERNEL_PACKAGE}"
@@ -450,7 +450,7 @@ prepare_kernel_and_firmware() {
   if [ "${HAS_CUSTOM_KERNEL}" = 1 ]; then
     # Custom kernel: still need standard kernel package for device trees
     KERNEL_META=linux-image-rpi-v8
-    KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*')
+    KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*' | grep -m1 '^linux-image-')
     apt_download "$KERNEL_PACKAGE"
     KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
     apt_download "${KERNEL_PACKAGE}"
