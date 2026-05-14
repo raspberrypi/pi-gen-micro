@@ -228,7 +228,7 @@ directory. After adding or removing external packages, regenerate the index:
 .RS
 .nf
 cd /var/lib/pi\-gen\-micro/internal/packages
-dpkg\-scanpackages . /dev/null | gzip \-9c > Packages.gz
+dpkg\-scanpackages . /dev/null > Packages && gzip \-9kf Packages
 .fi
 .RE
 .SH ENVIRONMENT
