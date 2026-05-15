@@ -53,6 +53,14 @@ ExecStart=/bin/true
     sed --in-place '
     s/\(--keep-baud\)/--noclear --autologin root \1/' \
       build/etc/systemd/system/serial-getty@.service
+
+    # agetty --autologin root execs `/bin/login -f root`, which on this image
+    # is busybox login. busybox login consults /etc/passwd then /etc/shadow,
+    # and refuses the account when the password field is `*` (locked) with no
+    # shadow entry. Blank the password so login -f succeeds. AUTOLOGIN=1 is
+    # already a debug-only mode; passwordless root over serial is consistent
+    # with that contract.
+    sed --in-place 's/^root:[^:]*:/root::/' build/etc/passwd
   fi
 }
 
