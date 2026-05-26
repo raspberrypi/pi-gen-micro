@@ -1,0 +1,59 @@
+# Fastboot -- minimal provisioning image.
+# Tuned for minimum power consumption: lowest tolerable clocks, no audio,
+# no Bluetooth, no WiFi (the image is reached over USB or wired Ethernet).
+
+# Hardware interfaces not used by rpi-fastbootd.
+dtparam=audio=off
+camera_auto_detect=0
+display_auto_detect=0
+
+# No KMS driver, no framebuffers -- fastbootd is headless.
+disable_fw_kms_setup=1
+max_framebuffers=0
+
+arm_64bit=1
+disable_overscan=1
+disable_splash=1
+
+# Minimum GPU memory.
+gpu_mem=16
+
+# Disable wireless radios.
+dtoverlay=disable-bt
+dtoverlay=disable-wifi
+
+# Lower CPU clocks and disable boost on Pi 4 / CM4.
+arm_boost=0
+
+[cm4]
+arm_freq=1000
+arm_freq_min=600
+core_freq=250
+core_freq_min=200
+gpu_freq=250
+gpu_freq_min=200
+
+[pi4]
+arm_freq=1000
+arm_freq_min=600
+core_freq=250
+core_freq_min=200
+gpu_freq=250
+gpu_freq_min=200
+
+[pi5]
+arm_freq=1500
+gpu_freq=500
+
+[02W]
+arm_freq=800
+arm_freq_min=600
+
+[all]
+kernel=zImage
+initramfs rootfs.cpio.zst
+# Peripheral mode -- a host PC drives fastbootd over the USB OTG port.
+dtoverlay=dwc2,dr_mode=peripheral
+dtparam=uart0=on
+enable_uart=1
+uart_2ndstage=1
