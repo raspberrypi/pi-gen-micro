@@ -1,0 +1,36 @@
+# Kernel modules for hardware debug and analysis.
+# Most Pi GPIO/i2c/spi controllers are built into the kernel; this list
+# pulls in the loadable extras useful for an HW debug image.
+
+# Networking
+ipv6
+
+# I2C / SPI userspace device nodes
+i2c-dev
+spidev
+
+# 1-wire (common HW debug bus)
+w1-gpio
+w1-therm
+
+# Industrial I/O for sensor exploration
+industrialio
+
+# CAN bus
+can
+can-raw
+can-bcm
+vcan
+
+# USB gadget (useful for testing OTG on Pi Zero / CM)
+dwc2
+libcomposite
+usbfunc:ffs
+
+# MMC
+mmc-block
+
+# Cryptographic algorithms (smartmontools/nvme self-tests, dm-crypt poking)
+dm-crypt
+algif_skcipher
+crypto-xts(aes)

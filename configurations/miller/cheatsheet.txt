@@ -1,0 +1,171 @@
+================================================================================
+ MILLER -- Raspberry Pi hardware interface debug cheatsheet
+================================================================================
+
+  Most commands need root. You are logged in as root.
+  Live discovery:   lsblk   lsusb   lspci   ip -br link
+
+--------------------------------------------------------------------------------
+ GPIO / Pi firmware sensors  (raspi-utils-core)
+--------------------------------------------------------------------------------
+  pinctrl                              show all pin states, functions, pulls
+  pinctrl 17                           show one pin
+  pinctrl set 17 op dh                 drive GPIO17 output high
+  pinctrl set 17 ip pu                 input, pull-up
+  vcgencmd measure_temp                SoC temperature
+  vcgencmd measure_volts core          core voltage (also: sdram_c/i/p)
+  vcgencmd measure_clock arm           ARM clock (also: core, h264, isp, v3d)
+  vcgencmd get_throttled               throttling/undervoltage bitmask
+  vcgencmd get_config int              all firmware config values
+  vcgencmd bootloader_version          bootloader build info
+
+--------------------------------------------------------------------------------
+ GPIO via libgpiod  (gpiod)
+--------------------------------------------------------------------------------
+  gpiodetect                           list gpiochips
+  gpioinfo -c gpiochip0                list lines on chip0
+  gpioget  -c gpiochip0 17             one-shot read of line 17
+  gpioset  -c gpiochip0 17=1           set line 17 high (held while alive)
+  gpiomon  -c gpiochip0 17             watch edges (rising + falling)
+
+  miller-gpio-watch                    edges on EVERY line of EVERY gpiochip
+  miller-gpio-watch gpiochip0          edges on every line of gpiochip0
+  miller-gpio-claims                   who claims/releases lines (gpionotify)
+
+--------------------------------------------------------------------------------
+ I2C  (i2c-tools)
+--------------------------------------------------------------------------------
+  i2cdetect -y 1                       scan bus 1 for devices
+  i2cdump  -y 1 0x50                   dump all registers of device 0x50
+  i2cget   -y 1 0x50 0x00              read one byte
+  i2cset   -y 1 0x50 0x00 0xff         write one byte
+  Enable buses in /boot/firmware/config.txt: dtparam=i2c_arm=on
+
+--------------------------------------------------------------------------------
+ SPI / 1-Wire  (sysfs)
+--------------------------------------------------------------------------------
+  ls /dev/spidev*                      enabled SPI devices
+  ls /sys/bus/w1/devices/              1-wire slaves (e.g. DS18B20)
+  cat /sys/bus/w1/devices/28-*/w1_slave   read 1-wire temperature
+
+--------------------------------------------------------------------------------
+ Storage: SD / eMMC / NVMe / USB
+--------------------------------------------------------------------------------
+  lsblk -o NAME,SIZE,TYPE,MODEL        topology and models
+  mmc extcsd read /dev/mmcblk0         eMMC ext_csd dump (wear, lifetime)
+  mmc cid read   /dev/mmcblk0          card identifier
+  ls /sys/class/nvme/                  NVMe controllers (Pi 5)
+  cat /sys/class/nvme/nvme0/model      NVMe model string
+  cat /sys/class/nvme/nvme0/firmware_rev   NVMe firmware revision
+  hdparm -I /dev/sda                   USB/SATA identify, security state
+  parted /dev/mmcblk0 print            partition tables
+  cat /sys/block/mmcblk0/device/cid    raw CID via sysfs
+
+--------------------------------------------------------------------------------
+ Ethernet link / PHY  (ethtool)
+--------------------------------------------------------------------------------
+  ethtool eth0                         link state, speed, duplex, auto-neg
+  ethtool --cable-test eth0            TDR -- locates broken pair / distance
+  ethtool --phy-statistics eth0        PHY error counters
+  ethtool -S eth0                      driver/MAC stats
+  ethtool -d eth0                      MAC/PHY register dump
+  ethtool -m eth0                      SFP module EEPROM (USB-NIC docks)
+  ip -s link show eth0                 RX/TX bytes, drops, errors
+  cat /sys/class/net/eth0/phydev/*     PHY id, speed, duplex via sysfs
+  tcpdump -i eth0 -nn -v 'ether proto 0x88cc'   live LLDP frames (switch info)
+
+--------------------------------------------------------------------------------
+ WiFi  (iw, wireless-tools)
+--------------------------------------------------------------------------------
+  iw dev                               radios and interfaces
+  iw wlan0 scan                        scan visible BSSIDs
+  iw wlan0 link                        current association details
+  iwconfig wlan0                       legacy iface view
+  iw wlan0 station dump                connected stations / link metrics
+
+--------------------------------------------------------------------------------
+ HDMI / display  (kms++-utils, sysfs, cec-utils)
+--------------------------------------------------------------------------------
+  kmsprint                             dump connectors, encoders, CRTCs, modes
+  kmsprint -m                          include the active mode of each CRTC
+  ls /sys/class/drm/                   list DRM connectors (HDMI-A-1 etc.)
+  cat /sys/class/drm/card1-HDMI-A-1/status      connected / disconnected
+  cat /sys/class/drm/card1-HDMI-A-1/modes       supported modes
+  edid-decode /sys/class/drm/card1-HDMI-A-1/edid   decode sink EDID
+  fbset -i                             framebuffer info
+  cec-ctl --list-devices               HDMI CEC bus enumeration
+  cec-ctl --playback -S                act as CEC playback, scan bus
+
+--------------------------------------------------------------------------------
+ USB / PCI enumeration
+--------------------------------------------------------------------------------
+  lsusb                                USB device list
+  lsusb -t                             USB topology tree
+  lsusb -v -s <bus>:<dev>              full descriptors
+  lspci                                PCI device list  (Pi 5)
+  lspci -vvv                           full capabilities
+
+--------------------------------------------------------------------------------
+ Input (buttons, keyboards, touch)
+--------------------------------------------------------------------------------
+  evtest                               picks event device, dumps events live
+  cat /proc/bus/input/devices          enumerate input devices
+
+--------------------------------------------------------------------------------
+ Serial
+--------------------------------------------------------------------------------
+  picocom -b 115200 /dev/ttyAMA0       quick serial console (ctrl-a ctrl-x to quit)
+  picocom -b 115200 /dev/ttyUSB0       USB-serial adapter
+
+--------------------------------------------------------------------------------
+ CAN bus
+--------------------------------------------------------------------------------
+  ip link set can0 type can bitrate 500000
+  ip link set can0 up
+  candump can0                         dump frames
+  cansend can0 123#DEADBEEF            send a frame
+
+--------------------------------------------------------------------------------
+ Network capture & probing
+--------------------------------------------------------------------------------
+  tcpdump -i eth0 -nn -vv              capture and decode
+  ip -br addr                          interface addresses
+  ip -br link                          link states
+  ss -tulpn                            listening sockets
+
+--------------------------------------------------------------------------------
+ Userspace tracing / inspection
+--------------------------------------------------------------------------------
+  strace -p <pid>                      syscalls of a running process
+  lsof -p <pid>                        open files / sockets / devices
+  file <path>                          identify file type
+
+--------------------------------------------------------------------------------
+ CPU frequency / governor  (miller boots with `powersave` for low power)
+--------------------------------------------------------------------------------
+  cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor       current
+  cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq       current Hz
+  cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
+  for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+      echo ondemand > "$c"; done                                  bump for fast work
+
+--------------------------------------------------------------------------------
+ Hardware soak
+--------------------------------------------------------------------------------
+  memtester 256M 1                     basic memory pattern test
+
+--------------------------------------------------------------------------------
+ Useful sysfs / procfs paths
+--------------------------------------------------------------------------------
+  /sys/class/thermal/thermal_zone*/temp     CPU/GPU thermal zones (milli-degC)
+  /sys/class/net/eth0/phydev/               ethernet PHY attributes
+  /sys/class/drm/                           DRM connectors, EDID, modes
+  /sys/class/gpio/                          GPIO sysfs (legacy)
+  /sys/bus/i2c/devices/                     I2C buses and devices
+  /sys/devices/system/cpu/cpu0/cpufreq/     CPU frequency / governor
+  /sys/kernel/debug/                        debugfs (mount -t debugfs none here)
+  /proc/device-tree/                        live device tree
+  /proc/interrupts                          IRQ counts per CPU
+  /proc/iomem                               physical memory map
+
+================================================================================
