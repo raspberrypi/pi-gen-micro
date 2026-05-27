@@ -1,10 +1,17 @@
 [Unit]
-Description=Unlock and pivot root into a pre-defined LUKS container
+Description=Unlock and mount LUKS root at /sysroot
+Documentation=man:systemd.special(7) man:initrd-release(5)
+DefaultDependencies=no
+ConditionPathExists=/etc/initrd-release
+Conflicts=shutdown.target
+Before=initrd-root-fs.target initrd-switch-root.target shutdown.target
 
 [Service]
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/bin/init_cryptroot.sh
-StandardOutput=file:/cryptroot_stdout.log
-StandardError=file:/cryptroot_stderr.log
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=initrd-root-fs.target

@@ -38,12 +38,15 @@ fi
 # Unlock the LUKS container
 printf '%s' "$KEY" | /sbin/cryptsetup luksOpen "$CRYPT_DEVICE" cryptroot
 
-# Mount the root filesystem
-/usr/bin/busybox mount /dev/mapper/cryptroot /mnt
+# Mount the decrypted root at the conventional initrd mountpoint. systemd's
+# initrd-switch-root.service will pivot here once initrd-root-fs.target is
+# reached; we deliberately do not call `systemctl switch-root` ourselves.
+mkdir -p /sysroot
+/usr/bin/busybox mount /dev/mapper/cryptroot /sysroot
 
-# Mount boot partition (adjust partition number as needed)
+# Mount the firmware/boot partition under the soon-to-be real root. This is
+# the same partition the firmware loaded us from; the running OS expects it
+# at /boot/firmware.
 BOOT_PARTITION="$(echo "$CRYPT_DEVICE" | sed 's/[0-9]*$//')1"
-/usr/bin/busybox mount "$BOOT_PARTITION" /mnt/boot/firmware
-
-# Pivot to the unlocked root
-systemctl switch-root /mnt /usr/sbin/init
+mkdir -p /sysroot/boot/firmware
+/usr/bin/busybox mount "$BOOT_PARTITION" /sysroot/boot/firmware
