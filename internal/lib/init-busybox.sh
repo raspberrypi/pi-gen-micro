@@ -30,6 +30,13 @@ configure_init_modules() {
   # rcS invokes load_modules directly — no .service file needed
 }
 
+# No-op for busybox init: in_initrd is a systemd concept and busybox /init
+# scripts do their own root-pivot via `switch_root`, which does not consult
+# /etc/initrd-release. Provided for API symmetry with init-systemd.sh.
+configure_initrd_release() {
+  :
+}
+
 install_networking() {
   echo "Installing networking (busybox)"
   mkdir -p build/usr/share/udhcpc

@@ -127,6 +127,25 @@ Without systemd: busybox
 .TP
 .B AUTOLOGIN=1
 Enable automatic root login on console and serial.
+.TP
+.B INITRD=1
+Mark the image as an initrd by writing
+.I /etc/initrd-release
+(a symlink to
+.IR /etc/os-release ;
+see
+.BR initrd-release (5)).
+This selects
+.I initrd.target
+as the default boot target and unlocks
+.BR "systemctl switch-root" ,
+which systemd refuses outside initrd mode. Units that must run before the
+pivot should be wired with
+.B Before=initrd-root-fs.target
+and installed into
+.IR initrd-root-fs.target.wants .
+No-op when
+.BR SYSTEMD=0 .
 .RE
 .TP
 .B packages.list

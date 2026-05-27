@@ -70,7 +70,7 @@ $(list_configurations)
 
 Each configuration directory contains:
   build.parameters       Build-time settings (kernel bit size, custom kernel, etc.)
-  components.parameters  Feature flags: SYSTEMD, SSH, UDEV, NETWORK, NETWORK_BASIC, AUTOLOGIN, GETTY
+  components.parameters  Feature flags: SYSTEMD, SSH, UDEV, NETWORK, NETWORK_BASIC, AUTOLOGIN, GETTY, INITRD
   packages.list          Additional packages to install into the image
   kernel_modules.list    Kernel modules to include in the image
   installer_scripts.list Script to run for post-install setup (executed, not sourced)
@@ -166,6 +166,7 @@ fi
 #   configure_init_modules   - set up module loading (systemd service or rcS invocation)
 #   install_networking       - configure networking (systemd-networkd or udhcpc)
 #   configure_init_ssh       - SSH service startup (systemd unit or services.d script)
+#   configure_initrd_release - mark image as initrd (systemd switch-root prereq)
 
 # ---------------------------------------------------------------------------
 # Phase 1: Prepare build environment
@@ -352,6 +353,12 @@ configure_system() {
 
   # Init-specific service configuration (systemd units or inittab)
   configure_init_services
+
+  # Mark the image as an initrd if the configuration requests it. Required
+  # for any image that ends with `systemctl switch-root` (see initrd-release(5)).
+  if [ "${INITRD:-0}" = 1 ]; then
+    configure_initrd_release
+  fi
 
   sed -i 's:/bin/bash:/bin/sh:g' build/etc/passwd
 

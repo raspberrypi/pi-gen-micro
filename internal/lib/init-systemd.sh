@@ -69,6 +69,15 @@ configure_init_modules() {
   cp "${PREBUILTS_DIR}"/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
 }
 
+# Mark the image as an initrd: systemd's in_initrd() returns true when this
+# file exists, which selects initrd.target as the default boot target and
+# unlocks `systemctl switch-root`. Convention (initrd-release(5)) is a
+# symlink to /etc/os-release. Units that need to run before the switch
+# should be wired to initrd-root-fs.target (Before=, WantedBy=).
+configure_initrd_release() {
+  ln -sf /etc/os-release build/etc/initrd-release
+}
+
 install_networking() {
   echo "Installing & Enabling networking"
   apt_install systemd-timesyncd
