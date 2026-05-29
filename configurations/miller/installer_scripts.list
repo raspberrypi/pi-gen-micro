@@ -1,0 +1,80 @@
+#!/bin/sh
+set -e
+
+HERE="$(dirname "$0")"
+
+# Cheatsheet content (read by miller-help)
+install -D -m 0644 "${HERE}/cheatsheet.txt" \
+    build/usr/share/miller/cheatsheet.txt
+
+# Wrapper that pages the cheatsheet (or cats it if not a TTY)
+cat > build/usr/local/bin/miller-help <<'EOS'
+#!/bin/sh
+CHEATSHEET=/usr/share/miller/cheatsheet.txt
+if [ -t 1 ] && command -v less >/dev/null 2>&1; then
+    exec less -R "$CHEATSHEET"
+else
+    exec cat "$CHEATSHEET"
+fi
+EOS
+chmod 0755 build/usr/local/bin/miller-help
+
+# Watch edge events on every line of one or all gpiochips.
+# Kernel caps each gpiomon request at 64 lines (GPIO_V2_LINES_MAX), so big
+# chips are chunked into batches of 32 and run as parallel gpiomon procs.
+cat > build/usr/local/bin/miller-gpio-watch <<'EOS'
+#!/bin/sh
+# Usage: miller-gpio-watch [gpiochipN]   (default: every gpiochip)
+trap 'kill 0' INT TERM
+watch_chip() {
+    chip=$1
+    lines=$(gpioinfo -c "$chip" | awk '/line[ \t]+[0-9]+:/ {gsub(":","",$2); print $2}')
+    [ -n "$lines" ] || return 0
+    n=$(printf '%s\n' $lines | wc -l)
+    echo "[$chip] watching $n lines for edges..." >&2
+    printf '%s\n' $lines | xargs -n 32 -P 8 gpiomon -c "$chip"
+}
+if [ -n "$1" ]; then
+    watch_chip "$1"
+else
+    for dev in /dev/gpiochip*; do
+        watch_chip "${dev##*/}" &
+    done
+    wait
+fi
+EOS
+chmod 0755 build/usr/local/bin/miller-gpio-watch
+
+# Watch line claim/release/reconfigure events (who is grabbing GPIOs?).
+cat > build/usr/local/bin/miller-gpio-claims <<'EOS'
+#!/bin/sh
+# Usage: miller-gpio-claims [gpiochipN]   (default: every gpiochip)
+trap 'kill 0' INT TERM
+watch_chip() {
+    chip=$1
+    lines=$(gpioinfo -c "$chip" | awk '/line[ \t]+[0-9]+:/ {gsub(":","",$2); print $2}')
+    [ -n "$lines" ] || return 0
+    n=$(printf '%s\n' $lines | wc -l)
+    echo "[$chip] watching $n lines for claim/release..." >&2
+    printf '%s\n' $lines | xargs -n 32 -P 8 gpionotify -c "$chip"
+}
+if [ -n "$1" ]; then
+    watch_chip "$1"
+else
+    for dev in /dev/gpiochip*; do
+        watch_chip "${dev##*/}" &
+    done
+    wait
+fi
+EOS
+chmod 0755 build/usr/local/bin/miller-gpio-claims
+
+# MOTD: Miller quote + pointer to the cheatsheet
+cat > build/etc/motd <<'EOF'
+
+    Doors and corners, kid. That's where they get you.
+                                            -- Detective Miller
+
+    Type `miller-help` for a hardware-debug tool cheatsheet.
+
+EOF

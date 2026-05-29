@@ -1,0 +1,70 @@
+# Miller -- Raspberry Pi hardware debug image.
+# Tuned for minimum power consumption: lowest tolerable clocks, no audio,
+# no Bluetooth, minimal GPU. WiFi is left on because the image is for
+# debugging hardware, including the WiFi radio.
+
+# I2C and SPI on for hardware probing.
+dtparam=i2c_arm=on
+dtparam=spi=on
+
+# No audio output.
+dtparam=audio=off
+
+# No camera / display autoprobe.
+camera_auto_detect=0
+display_auto_detect=0
+
+# DRM driver required so /sys/class/drm/ and kmsprint work.
+dtoverlay=vc4-kms-v3d
+max_framebuffers=1
+
+# Skip firmware-injected video= in cmdline.txt.
+disable_fw_kms_setup=1
+
+arm_64bit=1
+disable_overscan=1
+disable_splash=1
+
+# Minimum GPU memory.
+gpu_mem=16
+
+# Disable Bluetooth radio (no bluez in image).
+dtoverlay=disable-bt
+
+# Lower CPU clocks and disable boost on Pi 4 / CM4.
+arm_boost=0
+
+[cm4]
+arm_freq=1000
+arm_freq_min=600
+core_freq=250
+core_freq_min=200
+gpu_freq=250
+gpu_freq_min=200
+
+[pi4]
+arm_freq=1000
+arm_freq_min=600
+core_freq=250
+core_freq_min=200
+gpu_freq=250
+gpu_freq_min=200
+
+[pi5]
+# BCM2712 firmware enforces ~1.5 GHz as the practical floor; cap the ceiling.
+arm_freq=1500
+gpu_freq=500
+
+[02W]
+# Zero 2 W tops out at 1 GHz anyway; pin lower.
+arm_freq=800
+arm_freq_min=600
+
+[all]
+kernel=zImage
+initramfs rootfs.cpio.zst
+# USB host mode so we can probe attached USB devices with lsusb / usbutils.
+dtoverlay=dwc2,dr_mode=host
+dtparam=uart0=on
+enable_uart=1
+uart_2ndstage=1

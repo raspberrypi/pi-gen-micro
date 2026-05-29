@@ -1,0 +1,152 @@
+pi-gen-micro is a system designed to build **tiny** embedded operating systems from the same package sources as Raspberry Pi OS.
+
+Why? Because this means you get the latest hardware support and updates in line with a widely-used and tested OS.
+
+# Installing
+
+## Build the package
+
+Requires standard Debian developer packages:
+
+    sudo apt install -y devscripts debhelper build-essential
+    debuild -uc -us
+
+## Installing the package
+
+    sudo apt install -y ../pi-gen-micro_0.6.0_all.deb
+
+# Usage
+
+    sudo pi-gen-micro <configuration> [target_devices]
+
+Run `pi-gen-micro --help` to see available configurations and options.
+
+Output is written to `$PWD/out_image/`. It is recommended to run from a temporary directory:
+
+    pushd $(mktemp -d)
+    sudo pi-gen-micro fastboot
+
+## Target devices
+
+An optional comma-separated list of target devices can be passed as the second argument to limit which device trees and firmware files are included. If omitted, files for all supported devices are included.
+
+Supported targets: `pi3`, `cm3`, `pi4`, `400`, `cm4`, `pi5`, `500`, `cm5`, `02W`
+
+    sudo pi-gen-micro fastboot cm5,pi5
+
+# Configurations
+
+pi-gen-micro ships with several built-in configurations. Each configuration has a `description` file with a one-line summary. To list them:
+
+    pi-gen-micro --list-configurations
+
+## Creating a custom configuration
+
+Create a new directory under the configurations path (default: `/var/lib/pi-gen-micro/configurations/`) with the following files:
+
+### Required files
+
+`build.parameters`  
+Sourced as a shell script. Sets build-time variables:
+
+- `KERNEL_BIT_SIZE` — kernel architecture (default: `64`)
+
+- `HAS_CUSTOM_KERNEL` — set to `1` to use a custom kernel (also requires `CUSTOM_KERNEL_PATH` and `CUSTOM_KERNEL_VERSION_STR`)
+
+`components.parameters`  
+Sourced as a shell script. Feature flags that control what gets installed:
+
+- `SYSTEMD=1` — use systemd as init system (default). Set to `0` for busybox init with `/etc/inittab` and shell scripts instead. Some helper packages (e.g. `cryptroot`) require systemd.
+
+- `SSH=1` — install dropbear SSH server (requires an `authorized_keys` file in internal/prebuilts)
+
+- `UDEV=1` — install udev for dynamic device management
+
+- `NETWORK=1` — install networking. With systemd: systemd-networkd and systemd-resolved (requires `UDEV=1`). Without systemd: busybox `udhcpc`.
+
+- `AUTOLOGIN=1` — enable automatic root login on console and serial
+
+`packages.list`  
+Newline-separated list of additional packages to install into the image. These are installed via `apt` from the configured sources.
+
+`kernel_modules.list`  
+Newline-separated list of kernel modules to include. Modules and their dependencies are resolved and copied using `rpi-modcopy`.
+
+`installer_scripts.list`  
+An executable script (not a list, despite the name) run after packages are installed. The configuration directory is added to `PATH`, so scripts within the configuration directory can be called by name.
+
+`dpkg_extra_args`  
+dpkg `path-exclude` / `path-include` rules to reduce image size by excluding documentation, locales, etc. Lines starting with `#` are ignored.
+
+### Optional files
+
+`description`  
+A one-line description of the configuration, shown by `pi-gen-micro --list-configurations` and in error messages.
+
+`cmdline.txt`  
+Custom kernel command line, overriding the default from prebuilts.
+
+`config.txt`  
+Custom firmware configuration, overriding the default from prebuilts.
+
+`post_creation.sh`  
+Executable script run after the full image is assembled. Useful for cleanup or additional modifications.
+
+`udebs.list`  
+Newline-separated list of udeb packages to install as substitute packages (patched with `Provides`/`Replaces`/`Conflicts` to satisfy dependencies).
+
+`delete.list`  
+Newline-separated list of paths to delete from the final image.
+
+`generic_delete.list`  
+Newline-separated list of filename patterns to delete from the final image (matched by `find -name`).
+
+# Helper packages
+
+pi-gen-micro includes a local package repository at `/var/lib/pi-gen-micro/internal/packages/`. Configurations install packages from this repository (alongside standard Debian and Raspberry Pi OS repositories) by listing them in their `packages.list`.
+
+The source for each helper package lives under `helper-packages/` (installed to `/var/lib/pi-gen-micro/helper-packages/`). Each is a directory containing a `control` file (binary package metadata), an `install` file (file-to-destination mappings with permissions), and optionally a `links` file (symlinks).
+
+## Automatic building
+
+When `pi-gen-micro` runs, it automatically builds all helper packages from source using `dpkg-deb` and regenerates the package index before the build starts. This means edits to helper package sources take effect on the next `pi-gen-micro` run with no manual steps.
+
+## Included helper packages
+
+Each helper package has a full description in its `control` file. To list all available packages with their descriptions:
+
+    pi-gen-micro --list-packages
+
+The descriptions are also embedded in the built `.deb` metadata, viewable with `dpkg --info <package>.deb`.
+
+## Using `build-packages` directly
+
+The `build-packages` script can also be used standalone:
+
+    build-packages --dry-run              # show what would be built
+    build-packages                        # rebuild all helper packages
+    build-packages cryptroot ssh-service  # rebuild specific packages only
+
+## Adding a new helper package
+
+1.  Create a directory under `helper-packages/` (e.g. `helper-packages/my-package/`).
+
+2.  Add the files to be packaged, a `control` file (standard Debian binary package control format), an `install` file (lines of `<source> <dest-dir> <mode>`), and optionally a `links` file (lines of `<target> <link-path>`).
+
+3.  Add the directory to `debian/install` so it is installed under `/var/lib/pi-gen-micro/helper-packages/`:
+
+        helper-packages/my-package          /var/lib/pi-gen-micro/helper-packages
+
+4.  Reference the package name (from `control`, not the directory name) in your configuration’s `packages.list`.
+
+The package will be built automatically on the next `pi-gen-micro` run.
+
+## Adding external pre-built packages
+
+To include a `.deb` not built from a helper package source (e.g. `rpi-fastbootd`, `rpi-imager-embedded`):
+
+1.  Place the `.deb` file in the `internal/packages/` directory.
+
+2.  Reference the package name in your configuration’s `packages.list`.
+
+The package index is regenerated automatically when `build-packages` runs (which happens at the start of every `pi-gen-micro` build), so no manual steps are needed. `build-packages` does not touch `.deb` files that lack a corresponding helper package source, so externally-provided packages are preserved across rebuilds.
