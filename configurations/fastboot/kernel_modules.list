@@ -16,3 +16,9 @@ crypto-xchacha12
 crypto-adiantum
 # For fastboot
 ipv6
+# Bootloader EEPROM measurement: rpi-fastbootd reads the SPI flash chip
+# identity (size/sha256/jedec/unique-id/spi-speed) over /dev/spidevX.Y.
+# spi-bcm2835 instantiates the spi master (spi10 on Pi 5, spi0 on Pi 4/CM4);
+# spidev exposes the userspace char device DetectSpiDev() stats for.
+spi-bcm2835
+spidev

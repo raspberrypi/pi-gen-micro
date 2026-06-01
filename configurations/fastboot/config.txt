@@ -22,6 +22,11 @@ gpu_mem=16
 dtoverlay=disable-bt
 dtoverlay=disable-wifi
 
+# Enable SPI so rpi-fastbootd can read the bootloader EEPROM chip identity.
+# Pi 5 exposes the EEPROM bus (spidev10.0) from its base device tree, but
+# Pi 4 / CM4 need this to instantiate spi0/spidev0.0.
+dtparam=spi=on
+
 # Lower CPU clocks and disable boost on Pi 4 / CM4.
 arm_boost=0
 
