@@ -35,6 +35,12 @@ if [ -z "$KEY" ]; then
     exit 1
 fi
 
+# Ensure device-mapper is available before cryptsetup touches
+# /dev/mapper/control. Opening the control node does not trigger the kernel's
+# auto-load, so dm_mod must be loaded explicitly; modprobe dm-crypt pulls it in
+# via the recorded dependency.
+modprobe dm-crypt
+
 # Unlock the LUKS container
 printf '%s' "$KEY" | /sbin/cryptsetup luksOpen "$CRYPT_DEVICE" cryptroot
 
