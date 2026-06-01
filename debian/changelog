@@ -1,3 +1,22 @@
+pi-gen-micro (0.8.0) trixie; urgency=medium
+
+  * Add 'miller' hardware-debug OS configuration
+  * fastboot: Enable SPI (spidev) and update rpi-fastbootd to expose
+    bootloader EEPROM measurements
+  * fastboot: Bump bundled rpi-fastbootd with TCP worker fixes
+  * fastboot: Lower clocks and switch to the powersave governor to
+    reduce power
+  * cryptroot: Use initrd-release and standard systemd mount units, drop
+    agetty
+  * cryptroot: Explicitly probe dm-crypt
+  * systemd: Add initrd-release marker handling
+  * init-systemd: Make root autologin passwordless
+  * build-packages: Also generate a plaintext Packages file
+  * Fix kernel package identification
+  * README: Convert from AsciiDoc to Markdown
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Mon, 01 Jun 2026 16:42:52 +0100
+
 pi-gen-micro (0.7.0) trixie; urgency=medium
 
   * rpi-imager-embedded: Switch from AppImage to vendored .deb under
