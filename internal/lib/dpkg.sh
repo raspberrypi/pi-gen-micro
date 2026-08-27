@@ -3,8 +3,27 @@
 # Sourced by pi-gen-micro — not executable on its own.
 # Expects: ROOTFS_DIR, DPKG_EXTRA_ARGS to be set by the caller.
 
+# Packages already fetched during this run. apt-get install --download-only
+# re-runs the whole solver (~16s once the build is emulated) even when the .deb
+# is already in the archive cache, and callers routinely re-request a package
+# that an earlier batch has just pulled in. Tracking this run's own downloads is
+# safe in a way that testing the cache is not: a cached .deb may be a stale
+# version left behind by an earlier build.
+declare -A APT_FETCHED=()
+
 apt_download() {
-  fakeroot apt-get install --download-only "$@" 2>/dev/null
+  local wanted=() pkg
+  for pkg in "$@"; do
+    [ -z "${APT_FETCHED[$pkg]:-}" ] || continue
+    wanted+=("$pkg")
+  done
+  if [ "${#wanted[@]}" -eq 0 ]; then
+    return 0
+  fi
+  fakeroot apt-get install --download-only "${wanted[@]}" 2>/dev/null
+  for pkg in "${wanted[@]}"; do
+    APT_FETCHED[$pkg]=1
+  done
 }
 
 apt_install() {
