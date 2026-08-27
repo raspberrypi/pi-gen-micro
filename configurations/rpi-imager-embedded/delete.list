@@ -86,3 +86,13 @@ usr/bin/who
 usr/bin/whoami
 usr/bin/yes
 usr/bin/zdump
+
+# udev helpers for hardware this image does not image from or to: ~1.2 MB.
+# The input path needs only udevadm itself and 60-input-id.rules.
+usr/lib/udev/scsi_id
+usr/lib/udev/cdrom_id
+usr/lib/udev/ata_id
+usr/lib/udev/iocost
+usr/lib/udev/dmi_memory_id
+usr/lib/udev/fido_id
+
