@@ -13,7 +13,7 @@ Requires standard Debian developer packages:
 
 ## Installing the package
 
-    sudo apt install -y ../pi-gen-micro_0.6.0_all.deb
+    sudo apt install -y ../pi-gen-micro_0.9.0_all.deb
 
 # Usage
 

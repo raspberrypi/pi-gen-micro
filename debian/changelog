@@ -1,3 +1,40 @@
+pi-gen-micro (0.9.0) trixie; urgency=medium
+
+  * Add pi-gen-micro-sysroot: build images on hosts that are not running
+    Raspberry Pi OS, by bootstrapping a Debian sysroot with mmdebstrap and
+    entering it in an unprivileged user namespace
+  * sysroot: Build in place, with no sysroot bootstrapped, when the host is
+    already the image's architecture and has the tooling
+  * sysroot: Use the host's own zstd and cpio when the image's architecture
+    is emulated, where the arch-neutral stages otherwise dominate
+  * dpkg: Resolve cached package paths without invoking apt
+  * dpkg: Skip re-downloading packages already fetched during a run
+  * Install a configuration's packages.list in a single apt transaction
+    rather than one apt invocation per package
+  * Drop a duplicate kernel package download
+  * Together the above take a fastboot build on an x86 host from 20m40s to
+    9m36s
+  * rpi-imager-embedded: Upgrade to rpi-imager-embedded 2.0.11.1
+  * Load the kernel modules a configuration lists: kernel_modules.list only
+    ever told rpi-modcopy which .ko files to copy in, and the loader was
+    installed for no configuration that listed any
+  * rpi-imager-embedded: Install udev via udev-udeb, without which libinput
+    -- and so all keyboard and mouse input -- sees no devices at all. The
+    installer's build links without libsystemd-shared, costing ~2.9 MB rather
+    than the ~8.4 MB the regular udev package needs
+  * rpi-imager-embedded: Wait for a keyboard or mouse rather than for
+    /dev/input/event0, which on Pi 5-class boards is the power button
+  * dpkg: Let a udeb substitute's dependencies be met by either the udeb or
+    the real package, and tolerate one that cannot be configured until later
+  * Declare dpkg-dev, wget, mtools and init-system-helpers, which were only
+    ever implied
+  * Build as Architecture: all; the package ships no compiled code
+  * sysroot: Take the package set from debian/control rather than restating it
+  * README: Document building on hosts that are not Raspberry Pi OS
+  * Correct documentation that said pi-gen-micro requires root; it does not
+
+ -- Tom Dewey <tom.dewey@raspberrypi.com>  Thu, 27 Aug 2026 10:47:41 +0100
+
 pi-gen-micro (0.8.0) trixie; urgency=medium
 
   * Add 'miller' hardware-debug OS configuration
