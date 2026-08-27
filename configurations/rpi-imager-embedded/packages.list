@@ -3,3 +3,5 @@ libc-bin
 rpi-imager-embedded
 xkb-data-udeb
 libudev1
+libcap2
+libkmod2
