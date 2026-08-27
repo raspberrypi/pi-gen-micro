@@ -316,10 +316,18 @@ install_components() {
 
   # Install configuration-specific packages
   IFS=', ' read -r -a array <<< "$(< "${CONFIGURATION_FOLDER}"/packages.list tr '\n' ', ')"
+  # One transaction rather than one apt invocation per package: each invocation
+  # re-parses the package cache, which costs ~16s under emulation, and apt
+  # orders the installs by dependency anyway.
+  packages=()
   for package in "${array[@]}"; do
-     echo "Installing ${package}"
-     apt_install "${package}"
+    [ -n "${package}" ] || continue
+    packages+=("${package}")
   done
+  if [ "${#packages[@]}" -gt 0 ]; then
+    echo "Installing: ${packages[*]}"
+    apt_install "${packages[@]}"
+  fi
 
   if [ "${NETWORK}" = 1 ] && [ "${NETWORK_BASIC}" = 1 ]; then
     echo "ERROR: NETWORK and NETWORK_BASIC are mutually exclusive." >&2
