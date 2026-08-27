@@ -104,18 +104,44 @@ install_udeb_substitute() {
   echo "Replaces: ${base_package} (= ${PACKAGE_VERSION})
 Conflicts: ${base_package} (= ${PACKAGE_VERSION})" >> "${EXTRACT_DIR}/DEBIAN/control"
 
+  # Let each dependency be satisfied by either the udeb or the real package.
+  # A udeb is built for the installer, where its whole dependency closure is
+  # udebs; here it stands in for a real package in an image assembled from real
+  # ones, and either may be what is actually installed. So libacl1-udeb becomes
+  # "libacl1-udeb | libacl1", keeping the version constraint on both.
+  #
+  # An alternative rather than a rename, so this works whichever way round the
+  # image was built, and dpkg still checks the dependency: a library that is
+  # genuinely absent fails at install time rather than at runtime.
+  #
+  # This mechanism previously only worked where a configuration happened to
+  # list a udeb's entire closure in udebs.list, as the readline set does.
+  sed -i -E '/^(Depends|Pre-Depends|Recommends):/ {
+    s/([a-z0-9][a-z0-9+.-]*)-udeb( \([^)]*\))?/\1-udeb\2 | \1\2/g
+  }' "${EXTRACT_DIR}/DEBIAN/control"
+
   dpkg-deb --root-owner-group --build "${EXTRACT_DIR}" "${PACKAGE_PATH}"
   rm -rf "${EXTRACT_DIR}"
 
+  # Configure now if we can. Substitutes are installed at the very top of
+  # install_base_system, so a udeb whose closure is entirely other udebs
+  # (libc6-udeb, the readline set) configures fine and must -- busybox is
+  # installed immediately afterwards and depends on libc6. A udeb that needs
+  # real libraries not yet unpacked cannot, so leave it unpacked and let the
+  # apt-get --fix-broken pass later in this same function configure it,
+  # resolving each "X-udeb | X" to whichever is available.
   set -o noglob
   # shellcheck disable=SC2086
-  fakeroot \
+  if ! fakeroot \
     dpkg \
       --instdir="$ROOTFS_DIR" \
       --admindir="$PWD/dpkg_admin" \
       --log="$PWD/dpkg_admin/dpkg.log" \
       --force-script-chrootless \
       ${DPKG_EXTRA_ARGS} \
-      --install "${PACKAGE_PATH}"
+      --install "${PACKAGE_PATH}"; then
+    echo "Note: ${udeb_package} unpacked but not yet configured;" \
+         "its dependencies are installed later in this build."
+  fi
   set +o noglob
 }
