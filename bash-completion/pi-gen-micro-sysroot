@@ -1,0 +1,32 @@
+#shellcheck shell=bash
+
+_complete_pi_gen_micro_sysroot() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local cmds="create run shell update clean remove status --help"
+    local devices="pi3 cm3 pi4 400 cm4 pi5 500 cm5 02W"
+
+    case "$COMP_CWORD" in
+        1)
+            mapfile -t COMPREPLY < <(compgen -W "${cmds}" -- "$cur")
+            ;;
+        2)
+            if [ "${COMP_WORDS[1]}" = run ]; then
+                local conf_root confs
+                conf_root="${CONFIGURATION_ROOT:-/var/lib/pi-gen-micro/configurations/}"
+                # From a checkout, configurations sit next to the script.
+                if [ ! -d "$conf_root" ] && [ -d "${COMP_WORDS[0]%/*}/configurations" ]; then
+                    conf_root="${COMP_WORDS[0]%/*}/configurations"
+                fi
+                confs="$(find "$conf_root" -mindepth 1 -maxdepth 1 -type d -printf '%P\n' 2>/dev/null)"
+                mapfile -t COMPREPLY < <(compgen -W "${confs}" -- "$cur")
+            fi
+            ;;
+        3)
+            if [ "${COMP_WORDS[1]}" = run ]; then
+                mapfile -t COMPREPLY < <(compgen -W "${devices}" -- "$cur")
+            fi
+            ;;
+    esac
+}
+
+complete -F _complete_pi_gen_micro_sysroot pi-gen-micro-sysroot

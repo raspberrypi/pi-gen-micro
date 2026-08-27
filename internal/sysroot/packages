@@ -1,0 +1,28 @@
+# Host packages the build sysroot needs *in addition to* pi-gen-micro's own
+# dependencies. The dependencies themselves are not restated here:
+# pi-gen-micro-sysroot reads them straight out of debian/control, so the two
+# cannot drift apart.
+#
+# What belongs here is only what is deliberately not a pi-gen-micro dependency.
+# --force-script-chrootless runs the *image's* maintainer scripts against the
+# sysroot, and they resolve commands and absolute paths there rather than under
+# DPKG_ROOT. Raspberry Pi OS build hosts happen to have these already, so the
+# need is invisible until the host is a minbase sysroot:
+#
+#   readline-common  its postinst reads /usr/share/readline/inputrc
+#   adduser, passwd  tcpdump and i2c-tools postinsts call addgroup
+#   ucf              used by postinsts that manage conffiles
+#
+# Blank lines and lines starting with '#' are ignored.
+
+adduser
+passwd
+readline-common
+ucf
+
+# Fetching archive keyrings over HTTPS during bootstrap.
+ca-certificates
+
+# apt/dpkg plumbing beyond what the dependencies pull in.
+apt-utils
+xz-utils

@@ -17,14 +17,25 @@ Requires standard Debian developer packages:
 
 # Usage
 
-    sudo pi-gen-micro <configuration> [target_devices]
+    pi-gen-micro-sysroot run <configuration> [target_devices]
+
+On a host that isn't Raspberry Pi OS, `pi-gen-micro-sysroot` supplies the Debian
+userland and Raspberry Pi tooling the build needs — see [Building on a host that
+isn't Raspberry Pi OS](#building-on-a-host-that-isnt-raspberry-pi-os). It also
+runs the build in a user namespace, which is worth having on its own:
+`delete.list` and `generic_delete.list` are applied with an unquoted,
+glob-expanded `rm -rf`, and under `sudo` that runs as real root against the host.
+
+`pi-gen-micro` can equally be invoked directly:
+
+    pi-gen-micro <configuration> [target_devices]
 
 Run `pi-gen-micro --help` to see available configurations and options.
 
 Output is written to `$PWD/out_image/`. It is recommended to run from a temporary directory:
 
     pushd $(mktemp -d)
-    sudo pi-gen-micro fastboot
+    pi-gen-micro-sysroot run fastboot
 
 ## Target devices
 
@@ -32,7 +43,138 @@ An optional comma-separated list of target devices can be passed as the second a
 
 Supported targets: `pi3`, `cm3`, `pi4`, `400`, `cm4`, `pi5`, `500`, `cm5`, `02W`
 
-    sudo pi-gen-micro fastboot cm5,pi5
+    pi-gen-micro-sysroot run fastboot cm5,pi5
+
+# Building on a host that isn't Raspberry Pi OS
+
+The instructions above assume Raspberry Pi OS, or another Debian of the image's
+own architecture. `pi-gen-micro-sysroot` lifts that requirement: it
+bootstraps a throwaway Debian sysroot with `mmdebstrap`, installs the Raspberry
+Pi archive tooling into it, and runs `pi-gen-micro` inside it in an
+unprivileged user namespace. Nothing is installed on the host.
+
+    pi-gen-micro-sysroot run fastboot cm5,pi5
+
+Output lands in `$PWD/out_image/` and is owned by you, exactly as for a native
+build.
+
+A sysroot is only bootstrapped when the host needs one. Where the host is
+already the image's architecture and has pi-gen-micro's tooling — a Raspberry
+Pi, or any Debian of that architecture — the build runs **in place** and only
+the namespace is set up, so nothing is downloaded. `USE_SYSROOT` overrides the choice: `auto` (default), `1` to always
+bootstrap, `0` to never. `status` reports which mode applies.
+
+The namespace earns its keep even in place: it stops `delete.list` and
+`generic_delete.list` — which are applied with an unquoted, glob-expanded
+`rm -rf` — from running as real root.
+
+When a sysroot is used it is created on first use, reused afterwards, and is
+about 150 MB:
+
+    pi-gen-micro-sysroot create     # bootstrap (implied by run/shell)
+    pi-gen-micro-sysroot status     # paths, suite, architecture, state
+    pi-gen-micro-sysroot shell      # poke around inside a failed build
+    pi-gen-micro-sysroot update     # apt update && dist-upgrade
+    pi-gen-micro-sysroot clean      # remove build artefacts from $PWD
+    pi-gen-micro-sysroot remove     # delete it
+
+Use `clean` rather than `rm -rf` to tidy a build tree: `dpkg` chowns unpacked
+files to non-root ids, which land as subuids on the host and cannot be unlinked
+from outside the namespace. Rebuilding needs no cleanup either way, since
+`pi-gen-micro` clears `build/` and `dpkg_admin/` itself.
+
+Run from a git checkout, it points `pi-gen-micro` at the checkout, so edits to
+configurations and helper packages take effect immediately with no reinstall.
+
+## Host requirements
+
+Always: `uidmap`, an entry in `/etc/subuid` and `/etc/subgid` for your user
+(usually created with the account), and unprivileged user namespaces enabled.
+
+Only when a sysroot is needed:
+
+    sudo apt install -y mmdebstrap gnupg curl
+
+Building for an architecture that is not the host's additionally needs
+`qemu-user-static` and `binfmt-support`, since `binfmt_misc` registration is
+kernel-wide and cannot be arranged from inside the tool.
+
+## Why a sysroot, and why it matches the image's architecture
+
+`pi-gen-micro` needs `rpi-make-boot-image` and `rpi-modcopy`, which only the
+Raspberry Pi archive publishes, plus the Debian and Raspberry Pi keyrings. The
+sysroot is where those come from — hence "fetching the Raspberry Pi packages it
+needs to operate" rather than expecting them on the host.
+
+The sysroot's architecture matches the image's (default `arm64`) rather than the
+host's, and that is not a preference. `dpkg` has its native architecture
+compiled in and cannot be told to treat another as native. An amd64 `dpkg`
+therefore sees the image's arm64 packages as foreign, and an `Architecture: all`
+package's unqualified dependencies — `libpam-runtime` needing `libpam-modules`,
+say — can never be satisfied by them. Running an arm64 `dpkg` under `qemu-user`
+costs wall-clock time and removes the whole class of problem. On an arm64 host
+it is native and free.
+
+### Native helpers
+
+The emulation cost is concentrated in the arch-neutral stages, and it is not
+subtle: compressing a 70 MB initramfs with `zstd --ultra -22 --long` takes 21 s
+natively against roughly nine minutes emulated.
+
+`zstd` and `cpio` only transform bytes, so the sysroot uses the host's own
+builds of them. `create` copies each host binary into `/native` with its
+libraries and writes a wrapper that invokes it through the host's dynamic
+loader, so the sysroot's glibc and the host's need not agree; `/native/bin` goes
+first on `PATH`. Everything that touches packages — `dpkg`, `apt`, maintainer
+scripts, `ldconfig`, `depmod` — stays native to the image, which is the whole
+point of the sysroot's architecture. `status` reports which helpers are in
+place, and a tool missing from the host is simply left emulated.
+
+Extending the set is one string, `NATIVE_TOOLS`, but only tools that transform
+data belong in it.
+
+End to end, this took a `fastboot cm5` build on an x86 host from 20m40s to
+13m01s.
+
+## Archive keys
+
+Keyrings are needed before apt can verify anything, so they are fetched over the
+network and then checked against fingerprints recorded in the script:
+
+    04B54C3CDCA79751B16BC6B5225629DF75B188BD  Debian 13 (trixie) archive
+    CF8A1AF502A2AA2D763BAE7E82B129927FA3303E  Raspberry Pi archive
+
+A host keyring is reused when it already contains the expected key. Supporting
+another suite means adding a line to the `case` on `SYSROOT_DIST`.
+
+Two wrinkles are worth knowing about, because both present as "the repository is
+not signed":
+
+- The bootstrap apt runs *outside* the chroot with `Dir=<root>`, but `Signed-By`
+  is read as a plain filesystem path and is not rewritten relative to `Dir`. The
+  sources written during bootstrap therefore name the keyrings by host path, and
+  are replaced with in-chroot ones before the sysroot is packed up.
+- The Raspberry Pi archive key carries SHA1 self-certifications, which apt on
+  trixie — Sequoia-based rather than `gpgv`-based — rejects from 2026-02-01
+  onwards. The sysroot ships a relaxed hash policy at
+  `/etc/crypto-policies/back-ends/apt-sequoia.config` to accept them.
+
+## How it works
+
+Bootstrap goes to a tarball rather than straight to a directory: `mmdebstrap`'s
+`unshare` mode writes as a subuid, and extracting the tar ourselves is what
+keeps the tree owned by — and therefore deletable by — you.
+
+Builds then run as uid 0 in a user namespace that maps you to root and your
+subuid/subgid range to 1..N. Mapping the range matters because `dpkg` chowns
+unpacked files to non-root ids; mapping you (rather than a subuid) to root
+matters so that the output is yours afterwards. `/dev`, `/proc` and `/sys` are
+bind-mounted in, and both the source tree and `$PWD` are bound at identical
+paths inside and out, so every path the build prints means the same thing in
+both.
+
+This mirrors the rootless chroot helpers in `rpi-imager`'s `debian/` directory,
+which solve the same problem for Qt builds.
 
 # Configurations
 

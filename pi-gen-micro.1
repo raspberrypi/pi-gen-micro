@@ -34,7 +34,7 @@ working directory:
 .RS
 .nf
 pushd $(mktemp \-d)
-sudo pi\-gen\-micro fastboot
+pi\-gen\-micro fastboot
 .fi
 .RE
 .SH OPTIONS
@@ -267,13 +267,21 @@ Path to the prebuilt files directory. Default:
 .B HELPER_PACKAGES_DIR
 Path to helper package sources. Default:
 .IR /var/lib/pi\-gen\-micro/helper\-packages .
+.SH NON\-RASPBERRY PI OS HOSTS
+.B pi\-gen\-micro
+expects a Debian userland of the image's own architecture, plus tooling from the
+Raspberry Pi archive. On a host that has neither, use
+.BR pi\-gen\-micro\-sysroot (1),
+which bootstraps a throwaway Debian sysroot with
+.BR mmdebstrap (1)
+and runs the build inside it in an unprivileged user namespace.
 .SH EXAMPLES
 Build the fastboot image for all devices:
 .PP
 .RS
 .nf
 pushd $(mktemp \-d)
-sudo pi\-gen\-micro fastboot
+pi\-gen\-micro fastboot
 .fi
 .RE
 .PP
@@ -281,7 +289,7 @@ Build for specific devices only:
 .PP
 .RS
 .nf
-sudo pi\-gen\-micro fastboot cm5,pi5
+pi\-gen\-micro fastboot cm5,pi5
 .fi
 .RE
 .PP
@@ -316,6 +324,7 @@ Pre-built files copied into images (config.txt, cmdline.txt, passwd, etc.).
 .BR dpkg\-deb (1),
 .BR dpkg (1),
 .BR fakeroot (1),
+.BR pi\-gen\-micro\-sysroot (1),
 .BR rpi\-make\-boot\-image (1)
 .SH AUTHORS
 Richard Oliver <richard.oliver@raspberrypi.com>
