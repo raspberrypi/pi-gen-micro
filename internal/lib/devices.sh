@@ -20,6 +20,22 @@ install_bcm2711_firmware() {
   cp raspi-firmware/LICENCE.broadcom "${OUT_DIR}"/
 }
 
+# Device families, by the SoC whose firmware and DTBs they share. A provisioning
+# station is pinned to one family by rpi-sb-provisioner's RPI_DEVICE_FAMILY, so
+# building per family drops a fastboot image from ~51MB to ~27MB.
+expand_device_families() {
+  local out=() target
+  for target in "$@"; do
+    case "$target" in
+      pi5-family) out+=(cm5 pi5 500) ;;
+      pi4-family) out+=(cm4 400 pi4) ;;
+      pi3-family) out+=(pi3 cm3 02W) ;;
+      *)          out+=("$target") ;;
+    esac
+  done
+  printf '%s\n' "${out[@]}"
+}
+
 install_device_files() {
   local target="$1"
   local kimg="${KPKG_EXTRACT}/usr/lib/linux-image-${KERNEL_VERSION_STR}"
