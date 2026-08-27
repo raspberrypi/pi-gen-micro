@@ -1,17 +1,20 @@
 #!/bin/sh
+#
+# Load the modules named in modules-load.d, for images with no systemd.
+# Mirrors systemd-modules-load(8): each .conf holds one module per line, with
+# blank lines and #-comments ignored. systemd images use systemd's own native
+# implementation instead, so this is only installed for busybox init.
 
-# LOCATIONS="/etc/modules-load.d/*.conf, /run/modules-load.d/*.conf, /usr/local/lib/modules-load.d/*.conf, /usr/lib/modules-load.d/*.conf, "
-# IFS=', ' read -r -a locations <<< "$(echo $LOCATIONS)"
-
-locs="path1 path2 path3 path4"
-set -- $locs
-for location in "/etc/modules-load.d/*.conf /run/modules-load.d/*.conf /usr/local/lib/modules-load.d/*.conf /usr/lib/modules-load.d/*.conf" ; do
-    set -- $(cat $location | tr '\n' ' ')
-    while [ -n "$1" ]; do
-        echo "Modprobing $1"
-        /sbin/modprobe $1
-        shift
+for dir in /etc/modules-load.d /run/modules-load.d \
+           /usr/local/lib/modules-load.d /usr/lib/modules-load.d; do
+    [ -d "$dir" ] || continue
+    for conf in "$dir"/*.conf; do
+        [ -f "$conf" ] || continue
+        while read -r module _; do
+            case "$module" in
+                ''|\#*) continue ;;
+            esac
+            modprobe "$module" || echo "load_modules: $module failed" >&2
+        done < "$conf"
     done
 done
-
-sleep 2
