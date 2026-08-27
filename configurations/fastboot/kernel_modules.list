@@ -22,3 +22,6 @@ ipv6
 # spidev exposes the userspace char device DetectSpiDev() stats for.
 spi-bcm2835
 spidev
+# f2fs, so rpi-fastbootd can mount a freshly-flashed filesystem to grow it.
+# ext4 is built in.
+f2fs
