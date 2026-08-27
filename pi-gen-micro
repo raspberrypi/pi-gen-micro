@@ -59,6 +59,11 @@ Arguments:
   target_devices   Comma-separated list of target devices (optional)
                    If omitted, builds for all supported devices.
                    Supported: pi3, cm3, pi4, 400, cm4, pi5, 500, cm5, 02W
+                   Family shorthands, each expanding to the devices sharing
+                   that SoC's firmware and device trees:
+                     pi5-family  = cm5, pi5, 500
+                     pi4-family  = cm4, 400, pi4
+                     pi3-family  = pi3, cm3, 02W
 
 Options:
   -h, --help             Show this help message
@@ -520,6 +525,7 @@ prepare_kernel_and_firmware() {
     mv "${KPKG_EXTRACT}"/usr/lib/linux-image-"${KERNEL_VERSION_STR}"/overlays/*.dtb* "${OUT_DIR}"/overlays/
   else
     IFS=',' read -ra target_devices <<< "$2"
+    target_devices=($(expand_device_families "${target_devices[@]}"))
     for target in "${target_devices[@]}"; do
       echo "Installing files for ${target}"
       install_device_files "$target"

@@ -52,6 +52,14 @@ devices are included.
 .PP
 Supported targets:
 .BR pi3 ", " cm3 ", " pi4 ", " 400 ", " cm4 ", " pi5 ", " 500 ", " cm5 ", " 02W
+.PP
+Family shorthands expand to the devices that share an SoC's firmware and
+device trees:
+.BR pi5\-family " (" cm5 ", " pi5 ", " 500 "), "
+.BR pi4\-family " (" cm4 ", " 400 ", " pi4 ") and "
+.BR pi3\-family " (" pi3 ", " cm3 ", " 02W ")."
+Building one image per family excludes firmware the target cannot load,
+roughly halving a fastboot image.
 .RE
 .TP
 .B \-h\fR, \fB\-\-help
