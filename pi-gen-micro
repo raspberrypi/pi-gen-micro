@@ -441,7 +441,6 @@ prepare_kernel_and_firmware() {
     KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*' | grep -m1 '^linux-image-')
     apt_download "$KERNEL_PACKAGE"
     KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
-    apt_download "${KERNEL_PACKAGE}"
 
     KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
     dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
@@ -468,7 +467,6 @@ prepare_kernel_and_firmware() {
     KERNEL_PACKAGE=$(apt-cache depends $KERNEL_META | grep -oP 'Depends: \K.*' | grep -m1 '^linux-image-')
     apt_download "$KERNEL_PACKAGE"
     KERNEL_VERSION_STR=${KERNEL_PACKAGE#linux-image-}
-    apt_download "${KERNEL_PACKAGE}"
 
     KPKG_EXTRACT="$(mktemp --directory --tmpdir kernel_package.XXX)"
     dpkg-deb --raw-extract "$(get_package_path "${KERNEL_PACKAGE}")" "${KPKG_EXTRACT}"
