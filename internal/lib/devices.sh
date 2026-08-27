@@ -3,6 +3,23 @@
 # Sourced by pi-gen-micro — not executable on its own.
 # Expects: KPKG_EXTRACT, KERNEL_VERSION_STR, OUT_DIR to be set by the caller.
 
+# Firmware the BCM2835/6/7 boot ROM (Pi 0-3) loads. Named rather than globbed:
+# raspi-firmware's camera, debug and cutdown variants need start_x=1,
+# start_debug=1 or a low gpu_mem, none of which any configuration here sets.
+install_bcm283x_firmware() {
+  cp raspi-firmware/bootcode.bin "${OUT_DIR}"/
+  cp raspi-firmware/start.elf "${OUT_DIR}"/
+  cp raspi-firmware/fixup.dat "${OUT_DIR}"/
+  cp raspi-firmware/LICENCE.broadcom "${OUT_DIR}"/
+}
+
+# Firmware the BCM2711 boot ROM (Pi 4 family) loads.
+install_bcm2711_firmware() {
+  cp raspi-firmware/start4.elf "${OUT_DIR}"/
+  cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
+  cp raspi-firmware/LICENCE.broadcom "${OUT_DIR}"/
+}
+
 install_device_files() {
   local target="$1"
   local kimg="${KPKG_EXTRACT}/usr/lib/linux-image-${KERNEL_VERSION_STR}"
@@ -26,27 +43,24 @@ install_device_files() {
       install_pi5_overlays
       ;;
     cm4)
-      cp raspi-firmware/start4.elf "${OUT_DIR}"/
-      cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
+      install_bcm2711_firmware
       cp "$kimg"/broadcom/bcm2711-rpi-cm4.dtb "${OUT_DIR}"/
       cp "$kimg"/broadcom/bcm2711-rpi-cm4s.dtb "${OUT_DIR}"/
       cp "$kimg"/broadcom/bcm2711-rpi-cm4-io.dtb "${OUT_DIR}"/
       install_pi4_overlays
       ;;
     400)
-      cp raspi-firmware/start4.elf "${OUT_DIR}"/
-      cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
+      install_bcm2711_firmware
       cp "$kimg"/broadcom/bcm2711-rpi-400.dtb "${OUT_DIR}"/
       install_pi4_overlays
       ;;
     pi4)
-      cp raspi-firmware/start4.elf "${OUT_DIR}"/
-      cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
+      install_bcm2711_firmware
       cp "$kimg"/broadcom/bcm2711-rpi-4-b.dtb "${OUT_DIR}"/
       install_pi4_overlays
       ;;
     pi3)
-      cp raspi-firmware/* "${OUT_DIR}"/
+      install_bcm283x_firmware
       cp "$kimg"/broadcom/bcm2710-rpi-3-b-plus.dtb "${OUT_DIR}"/
       cp "$kimg"/broadcom/bcm2710-rpi-3-b.dtb "${OUT_DIR}"/
       cp "$kimg"/broadcom/bcm2837-rpi-3-a-plus.dtb "${OUT_DIR}"/
@@ -54,12 +68,12 @@ install_device_files() {
       cp "$kimg"/broadcom/bcm2837-rpi-3-b-plus.dtb "${OUT_DIR}"/
       ;;
     cm3)
-      cp raspi-firmware/* "${OUT_DIR}"/
+      install_bcm283x_firmware
       cp "$kimg"/broadcom/bcm2710-rpi-cm3.dtb "${OUT_DIR}"/
       cp "$kimg"/broadcom/bcm2837-rpi-cm3-io3.dtb "${OUT_DIR}"/
       ;;
     02W)
-      cp raspi-firmware/* "${OUT_DIR}"/
+      install_bcm283x_firmware
       cp "$kimg"/broadcom/bcm2837-rpi-zero-2-w.dtb "${OUT_DIR}"/
       ;;
     *)
