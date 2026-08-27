@@ -377,10 +377,21 @@ configure_system() {
 
   apt_install xz-utils
 
-  # Module loading setup (init-specific)
-  if [ -z "${UDEV}" ]; then
-    configure_init_modules
-  else
+  # Turn the configuration's module list into a modules-load.d drop-in. Until
+  # now kernel_modules.list only told rpi-modcopy which .ko files to copy in;
+  # nothing ever asked for them to be loaded.
+  mkdir -p build/etc/modules-load.d
+  awk '{sub(/#.*/, "")} NF {print $1}' \
+    "${CONFIGURATION_FOLDER}"/kernel_modules.list \
+    > build/etc/modules-load.d/pi-gen-micro.conf
+
+  # Module loading setup (init-specific). This is needed whether or not udev is
+  # present: udev autoloads by MODALIAS, which covers hardware but never a
+  # named module like ipv6 or dm-crypt. It was previously gated on UDEV being
+  # unset, which no configuration that lists modules actually is.
+  configure_init_modules
+
+  if [ "${UDEV}" = 1 ]; then
     # Installed perl to help udev postinst, however don't need in final image
     rm -rf build/usr/lib/aarch64-linux-gnu/perl-base
     rm -rf build/usr/bin/perl

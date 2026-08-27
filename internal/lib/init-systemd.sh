@@ -65,8 +65,12 @@ ExecStart=/bin/true
 }
 
 configure_init_modules() {
-  cp "${PREBUILTS_DIR}"/load_modules.sh build/usr/local/bin/load_modules
-  cp "${PREBUILTS_DIR}"/systemd-modules-load.service build/etc/systemd/system/systemd-modules-load.service
+  # Nothing to install: systemd ships systemd-modules-load.service, already
+  # enabled via sysinit.target.wants, which reads modules-load.d natively and
+  # early. Dropping a unit of the same name into /etc/systemd/system would
+  # shadow it -- replacing a native implementation that runs before
+  # sysinit.target with a shell script ordered after multi-user.target.
+  :
 }
 
 # Mark the image as an initrd: systemd's in_initrd() returns true when this
