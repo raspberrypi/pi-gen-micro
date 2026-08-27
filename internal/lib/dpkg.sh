@@ -13,8 +13,20 @@ apt_install() {
 
 get_package_path() {
   local pkg_name="$1"
-  echo -n "apt_cache/archives/"
-  apt-get download "$pkg_name" --print-uris | awk '{print $2}'
+  local matches=()
+  mapfile -t matches < <(ls -t "apt_cache/archives/${pkg_name}"_*.deb \
+                               "apt_cache/archives/${pkg_name}"_*.udeb 2>/dev/null)
+  # Callers always apt_download first, so the archive is already cached and
+  # asking apt to recompute its filename costs a full cache parse -- ~5s per
+  # call once the build is emulated -- to learn what we already know. Take the
+  # shortcut only when it is unambiguous: with no match, or several versions
+  # where guessing wrong would install a stale package, defer to apt.
+  if [ "${#matches[@]}" -eq 1 ]; then
+    echo -n "${matches[0]}"
+  else
+    echo -n "apt_cache/archives/"
+    apt-get download "$pkg_name" --print-uris | awk '{print $2}'
+  fi
 }
 
 dpkg_unpack() {
