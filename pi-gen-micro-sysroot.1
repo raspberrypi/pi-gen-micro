@@ -1,0 +1,312 @@
+.\" pi-gen-micro-sysroot - build pi-gen-micro images without Raspberry Pi OS or root
+.TH PI\-GEN\-MICRO\-SYSROOT 1 "2026-08-25" "pi-gen-micro" "Raspberry Pi Tools"
+.SH NAME
+pi\-gen\-micro\-sysroot \- build pi\-gen\-micro images on any Linux host, without root
+.SH SYNOPSIS
+.B pi\-gen\-micro\-sysroot create
+.br
+.B pi\-gen\-micro\-sysroot run
+.I configuration
+.RI [ target_devices ]
+.br
+.B pi\-gen\-micro\-sysroot shell
+.RI [ command ...]
+.br
+.B pi\-gen\-micro\-sysroot update
+.br
+.B pi\-gen\-micro\-sysroot clean
+.br
+.B pi\-gen\-micro\-sysroot remove
+.br
+.B pi\-gen\-micro\-sysroot status
+.SH DESCRIPTION
+.BR pi\-gen\-micro (1)
+assumes it is running on Raspberry Pi OS as root: it needs a Debian userland of
+the image's own architecture, the Debian and Raspberry Pi archive keyrings, and
+.BR rpi\-make\-boot\-image (1)
+and
+.B rpi\-modcopy
+\(em which only the Raspberry Pi archive publishes.
+.PP
+.B pi\-gen\-micro\-sysroot
+removes both assumptions. It bootstraps a throwaway Debian sysroot with
+.BR mmdebstrap (1),
+installs the Raspberry Pi archive tooling into it, and runs
+.BR pi\-gen\-micro (1)
+inside it in an unprivileged user namespace. Nothing is installed on the host.
+.PP
+A sysroot is only bootstrapped when the host needs one. Where the host is
+already the image's architecture and has pi\-gen\-micro's tooling \(em a
+Raspberry Pi, or any Debian of that architecture \(em the build runs in place
+and only the namespace is set up, so nothing is downloaded.
+.B USE_SYSROOT
+overrides the choice and
+.B status
+reports which mode applies.
+.PP
+The namespace is worth having even in place:
+.I delete.list
+and
+.I generic_delete.list
+are applied with an unquoted, glob-expanded
+.BR rm (1),
+which under
+.BR sudo (8)
+runs as real root against the host.
+.PP
+The sysroot is created once and reused. It is roughly 150\ MB, lives outside the
+source tree, and can be deleted at any time with
+.BR "pi\-gen\-micro\-sysroot remove" .
+.SS Architecture
+The sysroot's architecture must match the image's, and defaults to it
+.RI ( arm64 ).
+This is not a matter of taste:
+.BR dpkg (1)
+has its native architecture compiled in and cannot be told to treat another as
+native, so an amd64
+.B dpkg
+sees the image's arm64 packages as foreign and can never satisfy the
+unqualified dependencies of an
+.B "Architecture: all"
+package from them. On an arm64 host the sysroot is native; elsewhere it runs
+under
+.BR qemu\-user (1)
+via
+.BR binfmt_misc (5),
+which must already be registered on the host \(em install
+.B qemu\-user\-static
+and
+.B binfmt\-support
+there.
+.SS Privileges
+The build runs as uid 0 inside a user namespace that maps the invoking user to
+root and their
+.BR subuid (5)
+and
+.BR subgid (5)
+ranges to 1..N. Mapping the range matters, because
+.BR dpkg (1)
+chowns unpacked files to non-root ids; mapping the caller (rather than a subuid)
+to root matters too, so that build output is owned by the caller afterwards.
+An entry in
+.I /etc/subuid
+and
+.I /etc/subgid
+is therefore required, along with
+.BR newuidmap (1)
+from
+.BR uidmap .
+Without them the build falls back to a namespace that maps only uid 0, and
+package installs that chown to other ids will fail.
+.SH COMMANDS
+.TP
+.B create
+Bootstrap the build sysroot. A no-op if one is already present, or if the host
+is suitable and the build will run in place. Called implicitly by
+.B run
+and
+.BR shell .
+.TP
+.BI run " configuration " [ target_devices ]
+Run
+.BR pi\-gen\-micro (1)
+inside the sysroot with the given arguments. The current directory is
+bind-mounted at the same path inside, so output is written to
+.I $PWD/out_image/
+exactly as it would be for a native build.
+.TP
+.BR shell " [\fIcommand\fR ...]"
+Run a command \(em by default an interactive shell \(em inside the sysroot.
+Useful for inspecting a failed build.
+.TP
+.B update
+.BR apt\-get (8)
+update and dist-upgrade the sysroot.
+.TP
+.B clean
+Remove
+.BR pi\-gen\-micro (1)
+build artefacts from the current directory. Prefer this to
+.BR rm (1):
+.BR dpkg (1)
+chowns unpacked files to non-root ids, which land as subuids on the host and
+cannot be unlinked from outside the namespace. Rebuilding does not require it \(em
+.BR pi\-gen\-micro (1)
+clears its own
+.I build/
+and
+.I dpkg_admin/
+on each run.
+.TP
+.B remove
+Delete the sysroot.
+.TP
+.B status
+Print the sysroot's paths, suite, architecture and state.
+.SH NATIVE HELPERS
+Emulation costs are concentrated in the arch-neutral stages:
+.B zstd \-\-ultra \-22
+on a 70\ MB initramfs takes about 21 seconds natively against some nine minutes
+emulated.
+.PP
+.B zstd
+and
+.B cpio
+only transform bytes, so the sysroot uses the host's builds of them.
+.B create
+copies each host binary into
+.I /native
+together with its libraries, and writes a wrapper that invokes it through the
+host's dynamic loader \(em so the sysroot's glibc and the host's need not agree.
+.I /native/bin
+is first on
+.BR PATH .
+A tool absent from the host is left emulated, and
+.B status
+reports which helpers are in place.
+.PP
+Everything that touches packages \(em
+.BR dpkg (1),
+.BR apt (8),
+maintainer scripts,
+.BR ldconfig (8),
+.BR depmod (8)
+\(em deliberately stays native to the image. Only tools that transform data
+belong in
+.BR NATIVE_TOOLS .
+.SH ENVIRONMENT
+.TP
+.B USE_SYSROOT
+Whether to build in a sysroot:
+.I auto
+(default) bootstraps one only when the host is unsuitable,
+.I 1
+always bootstraps one,
+.I 0
+never does and builds in place.
+.TP
+.B SYSROOT_DIR
+Sysroot location. Default:
+.IR ${XDG_CACHE_HOME:\-$HOME/.cache}/pi\-gen\-micro/sysroot\-<suite>\-<arch> .
+.TP
+.B SYSROOT_DIST
+Debian suite for the sysroot. Default:
+.IR trixie .
+Keep this in sync with
+.IR /var/lib/pi\-gen\-micro/internal/apt/sources.list.d/ ,
+so that the sysroot's apt and the image's apt agree on what the suite means.
+.TP
+.B SYSROOT_ARCH
+Sysroot architecture. Default:
+.BR TARGET_ARCH .
+.TP
+.B TARGET_ARCH
+Architecture of the image being built. Default:
+.IR arm64 .
+.TP
+.B DEBIAN_MIRROR
+Default:
+.IR http://deb.debian.org/debian .
+.TP
+.B DEBIAN_SECURITY_MIRROR
+Default:
+.IR http://deb.debian.org/debian\-security .
+.TP
+.B RPI_MIRROR
+Default:
+.IR http://archive.raspberrypi.com/debian .
+.TP
+.B KEYRING_CACHE
+Where fetched archive keyrings are cached. Default:
+.IR ${XDG_CACHE_HOME:\-$HOME/.cache}/pi\-gen\-micro/keyrings .
+.TP
+.B PI_GEN_MICRO_ROOT
+Where to find configurations, helper packages and internal data when not
+running from a source checkout. Default:
+.IR /var/lib/pi\-gen\-micro .
+.PP
+When run from a git checkout,
+.B pi\-gen\-micro\-sysroot
+detects this and points
+.BR pi\-gen\-micro (1)
+at the checkout, so edits to configurations and helper packages take effect
+without reinstalling the package.
+.SH KEYRINGS
+Archive keyrings are needed before apt can verify anything, so they are fetched
+over the network and then checked against fingerprints recorded in the script:
+.PP
+.RS
+.nf
+04B54C3CDCA79751B16BC6B5225629DF75B188BD  Debian 13 (trixie) archive
+CF8A1AF502A2AA2D763BAE7E82B129927FA3303E  Raspberry Pi archive
+.fi
+.RE
+.PP
+Published at
+.I https://ftp\-master.debian.org/keys.html
+and
+.I https://archive.raspberrypi.com/debian/raspberrypi.gpg.key
+respectively. A host keyring is reused when it already contains the expected
+key. Adding a suite means adding its fingerprint to
+the
+.B case
+on
+.B SYSROOT_DIST
+in the script.
+.PP
+The Raspberry Pi archive key carries SHA1 self-certifications, which apt on
+trixie \(em which verifies with Sequoia rather than
+.BR gpgv (1)
+\(em rejects from 2026-02-01 onwards. The sysroot therefore ships a relaxed
+hash policy in
+.IR /etc/crypto\-policies/back\-ends/apt\-sequoia.config ;
+without it every
+.I archive.raspberrypi.com
+fetch inside the sysroot fails as unsigned.
+.SH EXAMPLES
+Build the fastboot image for CM5 and Pi 5 on a non-Raspberry Pi OS host:
+.PP
+.RS
+.nf
+mkdir \-p ~/build && cd ~/build
+pi\-gen\-micro\-sysroot run fastboot cm5,pi5
+.fi
+.RE
+.PP
+Inspect the sysroot, then throw it away:
+.PP
+.RS
+.nf
+pi\-gen\-micro\-sysroot status
+pi\-gen\-micro\-sysroot shell
+pi\-gen\-micro\-sysroot remove
+.fi
+.RE
+.PP
+Build against a local mirror:
+.PP
+.RS
+.nf
+DEBIAN_MIRROR=http://mirror.example/debian \\
+RPI_MIRROR=http://mirror.example/raspberrypi \\
+    pi\-gen\-micro\-sysroot create
+.fi
+.RE
+.SH FILES
+.TP
+.I /var/lib/pi\-gen\-micro/internal/sysroot/packages
+Host build dependencies installed into the sysroot.
+.TP
+.I /etc/pi\-gen\-micro\-sysroot
+Written inside a sysroot to record the suite and architecture it was built for.
+.SH SEE ALSO
+.BR pi\-gen\-micro (1),
+.BR mmdebstrap (1),
+.BR unshare (1),
+.BR newuidmap (1),
+.BR subuid (5),
+.BR user_namespaces (7)
+.SH AUTHORS
+Richard Oliver <richard.oliver@raspberrypi.com>
+.br
+Tom Dewey <tom.dewey@raspberrypi.com>

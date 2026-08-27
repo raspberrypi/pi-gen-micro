@@ -1,0 +1,466 @@
+#!/usr/bin/env bash
+#
+# Build pi-gen-micro images on a host that is not Raspberry Pi OS, without root.
+#
+# pi-gen-micro needs a Debian userland of the image's own architecture, plus
+# tooling only the Raspberry Pi archive publishes (rpi-make-boot-image,
+# rpi-modcopy). This bootstraps a throwaway Debian sysroot with mmdebstrap,
+# installs that tooling into it, and runs pi-gen-micro inside it in an
+# unprivileged user namespace. No sudo anywhere.
+#
+# Mirrors rpi-imager's debian/ chroot helpers: bootstrap to a tarball in
+# unshare mode, extract it as the caller so the tree stays removable, then
+# enter it with unshare(1) + chroot(1).
+
+set -euo pipefail
+
+SELF_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+if [ -f "$SELF_DIR/internal/sysroot/packages" ]; then
+  SRC_ROOT="$SELF_DIR"                                   # git checkout
+  PI_GEN_MICRO="$SRC_ROOT/pi-gen-micro"
+else
+  SRC_ROOT="${PI_GEN_MICRO_ROOT:-/var/lib/pi-gen-micro}"
+  PI_GEN_MICRO="$(command -v pi-gen-micro || echo /usr/bin/pi-gen-micro)"
+fi
+
+# The mmdebstrap hooks below run as a subuid that cannot read $HOME and inherit
+# only the environment, so what they need is exported rather than interpolated.
+# The suite must match internal/apt/sources.list.d/, so that the sysroot's apt
+# and the image's apt agree on what "trixie" means.
+export SYSROOT_DIST="${SYSROOT_DIST:-trixie}"
+export TARGET_ARCH="${TARGET_ARCH:-arm64}"
+# The sysroot matches TARGET_ARCH, not the host: dpkg's native architecture is
+# compiled in, so an amd64 dpkg treats the image's arm64 packages as foreign and
+# can never satisfy an "Architecture: all" package's unqualified dependencies
+# from them. An arm64 dpkg under qemu-user costs time, not correctness.
+export SYSROOT_ARCH="${SYSROOT_ARCH:-$TARGET_ARCH}"
+export DEBIAN_MIRROR="${DEBIAN_MIRROR:-http://deb.debian.org/debian}"
+export DEBIAN_SECURITY_MIRROR="${DEBIAN_SECURITY_MIRROR:-http://deb.debian.org/debian-security}"
+export RPI_MIRROR="${RPI_MIRROR:-http://archive.raspberrypi.com/debian}"
+export MARKER=".pi-gen-micro-sysroot-ok"
+
+HOST_ARCH="$(dpkg --print-architecture)"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/pi-gen-micro"
+SYSROOT="${SYSROOT_DIR:-$CACHE/sysroot-$SYSROOT_DIST-$SYSROOT_ARCH}"
+KEYRINGS="${KEYRING_CACHE:-$CACHE/keyrings}"
+
+info() { printf 'pi-gen-micro-sysroot: %s\n' "$*" >&2; }
+die()  { info "$*"; exit 1; }
+
+# One EXIT trap: per-function traps would silently replace each other.
+TMP=()
+trap '[ ${#TMP[@]} -eq 0 ] || rm -rf "${TMP[@]}"' EXIT INT HUP TERM
+
+# --- user namespace ---------------------------------------------------------
+
+# Map the caller to uid 0 and their subuid range to 1..N. The range matters:
+# dpkg chowns unpacked files to non-root ids (systemd-networkd's postinst does),
+# which fails outright where only uid 0 is mapped. Mapping the caller — not a
+# subuid — to 0 matters too, so that build output ends up owned by them.
+# util-linux before 2.38 has no --map-users, hence newuidmap by hand.
+userns() {
+  local u g pid fifo sin go
+  u="$(awk -F: -v n="$(id -un)" '$1==n {print $2, $3; exit}' /etc/subuid)"
+  g="$(awk -F: -v n="$(id -un)" '$1==n {print $2, $3; exit}' /etc/subgid)"
+  if [ -z "$u" ] || [ -z "$g" ] || ! command -v newuidmap >/dev/null; then
+    info "no /etc/subuid entry or uidmap missing: chowns to non-root ids will fail"
+    unshare --user --map-root-user --mount --fork --kill-child -- "$@"
+    return
+  fi
+
+  fifo="$(mktemp -u)"; mkfifo "$fifo"; TMP+=("$fifo")
+  exec {sin}<&0                      # bash gives background jobs /dev/null
+  unshare --user --mount --fork --kill-child -- \
+    bash -c 'read -r _ <"$1"; shift; exec "$@"' _ "$fifo" "$@" <&"$sin" &
+  pid=$!
+  exec {sin}<&-
+  # Opening the fifo to write blocks until the child opens it to read, by which
+  # point the child's namespace exists and can be mapped.
+  exec {go}>"$fifo"
+  # newuidmap takes <nsid hostid count> triples: 0 maps to the caller, then
+  # 1..N to their subuid range ($u and $g are "<start> <count>" pairs).
+  # shellcheck disable=SC2086
+  newuidmap "$pid" 0 "$(id -u)" 1  1 $u
+  # shellcheck disable=SC2086
+  newgidmap "$pid" 0 "$(id -g)" 1  1 $g
+  echo . >&"$go"; exec {go}>&-
+  wait "$pid"
+}
+
+# --- archive keyrings -------------------------------------------------------
+
+# apt cannot verify anything until it has these, so they are fetched from each
+# archive's own canonical endpoint and then checked against a pinned
+# fingerprint. A host keyring is reused when it is new enough to know the suite
+# (Ubuntu 22.04's, for one, is not).
+#   https://ftp-master.debian.org/keys.html
+#   https://archive.raspberrypi.com/debian/raspberrypi.gpg.key
+RPI_FPR=CF8A1AF502A2AA2D763BAE7E82B129927FA3303E
+case "$SYSROOT_DIST" in
+  trixie)   DEBIAN_REL=13 DEBIAN_FPR=04B54C3CDCA79751B16BC6B5225629DF75B188BD ;;
+  bookworm) DEBIAN_REL=12 DEBIAN_FPR=B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8 ;;
+  *)        DEBIAN_REL='' DEBIAN_FPR='' ;;
+esac
+
+has_key() { [ -f "$1" ] && gpg --show-keys --with-colons "$1" 2>/dev/null | grep -q ":$2:"; }
+
+# keyring <name> <fingerprint> <url>...
+keyring() {
+  local name=$1 fpr=$2 dest="$KEYRINGS/$1.gpg" url
+  shift 2
+  has_key "$dest" "$fpr" && return 0
+  if has_key "/usr/share/keyrings/$name.gpg" "$fpr"; then
+    install -m0644 "/usr/share/keyrings/$name.gpg" "$dest"
+    return 0
+  fi
+  info "fetching $name"
+  for url in "$@"; do curl -fsSL "$url"; done | gpg --dearmor > "$dest"
+  chmod 0644 "$dest"
+  has_key "$dest" "$fpr" || die "$name as downloaded does not contain $fpr"
+}
+
+ensure_keyrings() {
+  [ -n "$DEBIAN_FPR" ] || die "unknown suite $SYSROOT_DIST: add its key to this script"
+  install -d -m0755 "$KEYRINGS"
+  local k=https://ftp-master.debian.org/keys
+  keyring debian-archive-keyring "$DEBIAN_FPR" \
+    "$k/archive-key-$DEBIAN_REL.asc" "$k/archive-key-$DEBIAN_REL-security.asc" \
+    "$k/release-$DEBIAN_REL.asc"
+  keyring raspberrypi-archive-keyring "$RPI_FPR" "${RPI_MIRROR%/}/raspberrypi.gpg.key"
+}
+
+# --- native helpers for the arch-neutral stages -----------------------------
+
+# Under emulation the arch-neutral stages dominate: zstd --ultra -22 on a 70 MB
+# initramfs takes ~21s natively against ~9 minutes emulated. These tools only
+# transform bytes, so the host's own builds are used for them; everything that
+# touches packages stays native to the image. They are copied in with their
+# libraries and invoked through the host's loader, so the sysroot's glibc and
+# the host's need not agree.
+NATIVE_TOOLS="zstd cpio"
+native_tools() {
+  [ "$SYSROOT_ARCH" != "$HOST_ARCH" ] || return 0
+  local d="$SYSROOT/native" t bin
+  rm -rf "$d"; install -d "$d/bin" "$d/lib"
+  for t in $NATIVE_TOOLS; do
+    bin="$(command -v "$t")" || { info "no host $t: leaving it emulated"; continue; }
+    install -m0755 "$bin" "$d/bin/$t.host"
+    # ldd prints dependencies as "name => /path", the loader as a bare path.
+    ldd "$bin" | awk '/=>/ {print $3} /^\t\// {print $1}' | grep '^/' | sort -u \
+      | xargs -r install -m0755 -t "$d/lib"
+    printf '#!/bin/sh\nexec /native/lib/%s --library-path /native/lib /native/bin/%s.host "$@"\n' \
+      "$(ldd "$bin" | awk '/^\t\// {print $1; exit}' | xargs basename)" "$t" \
+      > "$d/bin/$t"
+    chmod 0755 "$d/bin/$t"
+  done
+  info "native helpers for:$(printf ' %s' $NATIVE_TOOLS)"
+}
+
+# --- package set ------------------------------------------------------------
+
+# pi-gen-micro's own dependencies, read from the packaging rather than restated
+# here so the two cannot drift, plus internal/sysroot/packages, which holds only
+# what is deliberately *not* a pi-gen-micro dependency. Prefer debian/control (a
+# checkout); fall back to the installed package's metadata.
+package_list() {
+  local deps
+  if [ -f "$SRC_ROOT/debian/control" ]; then
+    deps="$(awk '/^(Depends|Recommends):/ {f = 1; sub(/^[^:]*:/, "")}
+                 /^[^ \t]/ && !/^(Depends|Recommends):/ {f = 0}
+                 f {printf "%s,", $0}' "$SRC_ROOT/debian/control")"
+  elif dpkg-query -W pi-gen-micro >/dev/null 2>&1; then
+    deps="$(dpkg-query -f '${Depends},${Recommends}' -W pi-gen-micro)"
+  else
+    die "cannot read pi-gen-micro's dependencies: no $SRC_ROOT/debian/control, and the package is not installed"
+  fi
+
+  # Strip version constraints, substvars and alternatives; merge with the extras.
+  { printf '%s\n' "$deps" | tr ',|' '\n\n'
+    sed 's/#.*//' "$SRC_ROOT/internal/sysroot/packages"
+  } | sed -e 's/(.*)//' -e 's/\${[^}]*}//' -e 's/[[:space:]]//g' \
+    | grep -v '^$' | sort -u | paste -sd,
+}
+
+# --- host suitability -------------------------------------------------------
+
+# The sysroot exists to substitute for an unsuitable host. Where the host is
+# already the image's architecture and has pi-gen-micro's tooling — a Raspberry
+# Pi, or any Debian of that architecture — bootstrapping a copy of it would be
+# pure cost, so only the namespace is set up and the build runs in place. The
+# namespace is still worth having on its own: it keeps delete.list and
+# generic_delete.list from running rm -rf as real root.
+HOST_TOOLS="rpi-make-boot-image rpi-modcopy fakeroot depmod cpio zstd rsync dpkg-scanpackages"
+in_place() {
+  case "${USE_SYSROOT:-auto}" in
+    0|no)  return 0 ;;
+    1|yes) return 1 ;;
+  esac
+  [ "$SYSROOT_ARCH" = "$HOST_ARCH" ] || return 1
+  local c
+  for c in $HOST_TOOLS; do
+    command -v "$c" >/dev/null || return 1
+  done
+  [ -f /usr/share/keyrings/raspberrypi-archive-keyring.pgp ]
+}
+
+# --- create -----------------------------------------------------------------
+
+sysroot_ok() { [ -f "$SYSROOT/$MARKER" ] && [ -x "$SYSROOT/usr/bin/dpkg" ]; }
+
+do_create() {
+  in_place && { info "host is suitable: building in place, no sysroot needed"; return 0; }
+  sysroot_ok && { info "sysroot present at $SYSROOT"; return 0; }
+  local c
+  for c in mmdebstrap curl gpg; do
+    command -v "$c" >/dev/null || die "not installed: $c"
+  done
+  ensure_keyrings
+
+  # mmdebstrap --mode=unshare runs apt and its hooks as a subuid that cannot
+  # traverse $HOME, so stage everything they read somewhere world-readable.
+  local stage
+  stage="$(mktemp -d "${TMPDIR:-/tmp}/pi-gen-micro-sysroot.XXXXXX")"
+  TMP+=("$stage"); chmod 0755 "$stage"
+  install -d -m0755 "$stage/keys"
+  install -m0644 "$KEYRINGS"/*.gpg "$stage/keys/"
+  export STAGE="$stage"
+
+  cat > "$stage/hook" <<'HOOK'
+#!/bin/sh
+# mmdebstrap hook, run twice. The bootstrap apt runs outside the chroot with
+# Dir=$root but reads Signed-By as a plain path that it does not rewrite, so
+# "setup" must name the keyrings by host path; "final" rewrites them for the
+# sysroot's own apt.
+set -eu
+mode=$1 root=$2
+install -d "$root/usr/share/keyrings" "$root/etc/apt/sources.list.d" \
+          "$root/etc/apt/preferences.d" "$root/etc/crypto-policies/back-ends"
+if [ "$mode" = setup ]; then
+  install -m0644 "$STAGE"/keys/*.gpg "$root/usr/share/keyrings/"
+  keys="$root/usr/share/keyrings"
+else
+  keys=/usr/share/keyrings
+fi
+
+echo '# Managed by pi-gen-micro-sysroot' > "$root/etc/apt/sources.list"
+cat > "$root/etc/apt/sources.list.d/pi-gen-micro.sources" <<EOF
+Types: deb
+URIs: ${DEBIAN_MIRROR%/}
+Suites: $SYSROOT_DIST $SYSROOT_DIST-updates
+Components: main contrib non-free non-free-firmware
+Architectures: $SYSROOT_ARCH
+Signed-By: $keys/debian-archive-keyring.gpg
+
+Types: deb
+URIs: ${DEBIAN_SECURITY_MIRROR%/}
+Suites: $SYSROOT_DIST-security
+Components: main contrib non-free non-free-firmware
+Architectures: $SYSROOT_ARCH
+Signed-By: $keys/debian-archive-keyring.gpg
+
+Types: deb
+URIs: ${RPI_MIRROR%/}
+Suites: $SYSROOT_DIST
+Components: main
+Architectures: $SYSROOT_ARCH
+Signed-By: $keys/raspberrypi-archive-keyring.gpg
+EOF
+
+# Keep the sysroot aligned with Raspberry Pi OS where the archives overlap.
+cat > "$root/etc/apt/preferences.d/10-pi-gen-micro.pref" <<'EOF'
+Package: *
+Pin: origin archive.raspberrypi.com
+Pin-Priority: 600
+EOF
+
+# The Raspberry Pi archive key carries SHA1 self-certifications, which apt on
+# trixie (Sequoia, not gpgv) rejects from 2026-02-01 unless the hash policy
+# allows them. Without this every archive.raspberrypi.com fetch is "not signed".
+cat > "$root/etc/crypto-policies/back-ends/apt-sequoia.config" <<'EOF'
+[hash_algorithms]
+sha1.second_preimage_resistance = 2030-01-01
+EOF
+
+[ "$mode" = final ] && touch "$root/$MARKER"
+exit 0
+HOOK
+  chmod 0755 "$stage/hook"
+
+  local tar="$SYSROOT.tar"
+  install -d -m0755 "$(dirname "$SYSROOT")"
+  rm -f "$tar"
+  info "bootstrapping $SYSROOT_DIST/$SYSROOT_ARCH -> $SYSROOT"
+  # Bootstrap to a tarball: unshare mode writes as a subuid, and extracting it
+  # ourselves is what keeps the tree owned by, and deletable by, the caller.
+  mmdebstrap --mode=unshare --format=tar --variant=minbase --arch="$SYSROOT_ARCH" \
+    --keyring="$stage/keys" --skip=check/signed-by \
+    --aptopt='APT::Sandbox::User "root"' --aptopt='Acquire::Retries "3"' \
+    --setup-hook="$stage/hook setup \"\$1\"" \
+    --customize-hook="$stage/hook final \"\$1\"" \
+    --include="$(package_list)" \
+    "$SYSROOT_DIST" "$tar" "${DEBIAN_MIRROR%/}"
+
+  install -d -m0755 "$SYSROOT"
+  tar -xf "$tar" -C "$SYSROOT" --no-same-owner --no-same-permissions --exclude='./dev/*'
+  rm -f "$tar"
+  native_tools
+  sysroot_ok || die "bootstrap finished but $SYSROOT looks incomplete"
+  info "sysroot ready at $SYSROOT"
+}
+
+# --- entering ---------------------------------------------------------------
+
+# Bind mounts use identical paths inside and out, so that any path the build
+# prints means the same thing in both.
+enter() {
+  if in_place; then
+    userns "$@"
+    return
+  fi
+  sysroot_ok || die "no sysroot at $SYSROOT (run: $(basename "$0") create)"
+  local script
+  script="$(mktemp)"; TMP+=("$script"); chmod 0755 "$script"
+  cat > "$script" <<EOF
+#!/bin/bash
+set -euo pipefail
+root=$(printf %q "$SYSROOT")
+for d in dev proc sys; do
+  mkdir -p "\$root/\$d"
+  mountpoint -q "\$root/\$d" \\
+    || { mount --rbind "/\$d" "\$root/\$d"; mount --make-rslave "\$root/\$d"; }
+done
+mkdir -p "\$root/tmp"
+mountpoint -q "\$root/tmp" || mount -t tmpfs tmpfs "\$root/tmp"
+chmod 1777 "\$root/tmp"
+{ : > "\$root/etc/resolv.conf" && mount --bind /etc/resolv.conf "\$root/etc/resolv.conf"; } || true
+for b in $(printf %q "$SRC_ROOT") $(printf %q "$PWD"); do
+  mkdir -p "\$root\$b"
+  mountpoint -q "\$root\$b" || mount --bind "\$b" "\$root\$b"
+done
+exec chroot "\$root" /usr/bin/env -i \\
+  PATH=/native/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \\
+  HOME=/root TERM="\${TERM:-dumb}" LC_ALL=C.UTF-8 PI_GEN_MICRO_SYSROOT=1 "\$@"
+EOF
+  userns "$script" "$@"
+}
+
+# Run in the sysroot from $PWD. pi-gen-micro's own defaults point into
+# /var/lib/pi-gen-micro; from a checkout, point it at the checkout so edits take
+# effect with no reinstall. CONFIGURATION_ROOT keeps its trailing slash, which
+# is how pi-gen-micro derives both the configuration and internal/packages paths.
+in_sysroot() {
+  local env=() path
+  if in_place; then
+    path="$SRC_ROOT:$PATH"
+  else
+    path="$SRC_ROOT:/native/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+  fi
+  [ "$SRC_ROOT" = /var/lib/pi-gen-micro ] || env=(
+    "CONFIGURATION_ROOT=$SRC_ROOT/configurations/"
+    "APT_DPKG_CFG=$SRC_ROOT/internal/apt"
+    "PREBUILTS_DIR=$SRC_ROOT/internal/prebuilts"
+    "HELPER_PACKAGES_DIR=$SRC_ROOT/helper-packages"
+    "LIB_DIR=$SRC_ROOT/internal/lib"
+    "PATH=$path"
+  )
+  enter /usr/bin/env "${env[@]}" sh -c 'cd "$1" && shift && exec "$@"' _ "$PWD" "$@"
+}
+
+# --- commands ---------------------------------------------------------------
+
+do_run() {
+  [ $# -ge 1 ] || die "usage: $(basename "$0") run <configuration> [target_devices]"
+  do_create
+  in_sysroot "$PI_GEN_MICRO" "$@"
+}
+
+do_shell() { do_create; in_sysroot "${@:-/bin/bash}"; }
+
+do_update() {
+  in_place && die "building in place: no sysroot to update"
+  enter sh -c 'apt-get -o APT::Sandbox::User=root update
+               apt-get -o APT::Sandbox::User=root -y \
+                 -o Dpkg::Options::=--force-confold dist-upgrade
+               apt-get clean'
+}
+
+# A build leaves files owned by the subuids dpkg chowned them to, which the
+# caller cannot unlink from outside the namespace. Rebuilding needs no cleanup:
+# pi-gen-micro clears its own build/ and dpkg_admin/ on each run.
+ARTEFACTS="build dpkg_admin apt apt.cfg apt_cache apt_lists packages out_image
+           raspi-firmware initramfs.cpio boot.img 2710_bootfiles.bin"
+do_clean() {
+  local present=() a
+  for a in $ARTEFACTS; do
+    [ -e "$a" ] || continue
+    present+=("$a")
+  done
+  [ ${#present[@]} -gt 0 ] || { info "nothing to clean in $PWD"; return 0; }
+  info "removing from $PWD: ${present[*]}"
+  rm -rf "${present[@]}" 2>/dev/null && return 0
+  userns /bin/sh -c "cd $(printf %q "$PWD") && rm -rf ${present[*]@Q}"
+}
+
+do_remove() {
+  [ -e "$SYSROOT" ] || { info "nothing to remove at $SYSROOT"; return 0; }
+  info "removing $SYSROOT"
+  rm -f "$SYSROOT.tar"
+  rm -rf "$SYSROOT" 2>/dev/null || userns /bin/sh -c "rm -rf $(printf %q "$SYSROOT")"
+  [ ! -e "$SYSROOT" ] || die "could not remove $SYSROOT"
+}
+
+do_status() {
+  printf 'sysroot   %s\n' "$SYSROOT"
+  printf 'suite     %s\n' "$SYSROOT_DIST"
+  printf 'arch      %s (host %s)\n' "$SYSROOT_ARCH" "$HOST_ARCH"
+  printf 'source    %s\n' "$SRC_ROOT"
+  printf 'native    %s\n' "$([ -d "$SYSROOT/native/bin" ] && echo "$NATIVE_TOOLS" || echo -)"
+  if in_place; then
+    printf 'state     building in place (host is suitable; no sysroot used)\n'
+    return 0
+  fi
+  if sysroot_ok; then
+    printf 'state     ready (%s)\n' "$(du -sh "$SYSROOT" 2>/dev/null | cut -f1)"
+  elif [ -e "$SYSROOT" ]; then
+    printf 'state     incomplete\n'
+  else
+    printf 'state     absent\n'
+  fi
+}
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") <command> [args]
+
+Build pi-gen-micro images on a non-Raspberry Pi OS host, without root, in a
+Debian sysroot populated from the Debian and Raspberry Pi archives.
+
+  create                   Bootstrap the sysroot (implied by run and shell)
+  run <config> [devices]   Run pi-gen-micro in it; output in \$PWD/out_image
+  shell [command...]       Shell, or a command, inside it
+  update                   apt update && dist-upgrade the sysroot
+  clean                    Remove pi-gen-micro build artefacts from \$PWD
+  remove                   Delete the sysroot
+  status                   Show paths and state
+
+A sysroot is only bootstrapped when the host is unsuitable. On a host that is
+already the image's architecture and has pi-gen-micro's tooling, the build runs
+in place in the namespace alone, so no sudo is needed there either. USE_SYSROOT
+overrides: auto (default), 1 to always bootstrap, 0 to never.
+
+Variables: USE_SYSROOT SYSROOT_DIR SYSROOT_DIST SYSROOT_ARCH TARGET_ARCH
+           DEBIAN_MIRROR DEBIAN_SECURITY_MIRROR RPI_MIRROR KEYRING_CACHE
+           PI_GEN_MICRO_ROOT
+
+Needs mmdebstrap, uidmap, gnupg, curl and an /etc/subuid entry; also
+qemu-user-static and binfmt-support when the image's architecture is not the
+host's. See pi-gen-micro-sysroot(1).
+EOF
+}
+
+case "${1:-}" in
+  create|run|shell|update|clean|remove|status) cmd=$1; shift; "do_$cmd" "$@" ;;
+  -h|--help|help) usage ;;
+  "") usage; exit 1 ;;
+  *) die "unknown command: $1 (try --help)" ;;
+esac

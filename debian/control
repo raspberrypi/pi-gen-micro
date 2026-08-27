@@ -11,6 +11,7 @@ Architecture: all
 Pre-Depends: dpkg (>= 1.16.1)
 Depends: ${misc:Depends}, rpi-make-boot-image, sed (>= 4.9), bash (>= 5.2), debian-archive-keyring, raspberrypi-archive-keyring, fakeroot, rpi-modcopy, rsync, systemd, kmod, cpio, zstd, dpkg-dev
 Recommends: curl, wget, dctrl-tools, coreutils (>= 9.1), gzip (>= 1.12), zstd (>= 1.5.4), mtools, init-system-helpers
+Suggests: mmdebstrap, uidmap, gnupg, qemu-user-static, binfmt-support
 Description: Tool to create cut-down Debian-based OS-images for Raspberry Pi Devices
  pi-gen-micro is a lightweight tool for creating minimal Debian-based
  operating system images optimized for Raspberry Pi devices. It allows
@@ -21,3 +22,9 @@ Description: Tool to create cut-down Debian-based OS-images for Raspberry Pi Dev
  .
  This package includes utilities and scripts necessary for building
  custom Raspberry Pi OS images with reduced size and resource requirements.
+ .
+ pi-gen-micro-sysroot(1) additionally allows images to be built on hosts that
+ are not running Raspberry Pi OS, and without root, by bootstrapping a Debian
+ build sysroot with mmdebstrap and entering it via a user namespace. That path
+ needs mmdebstrap, uidmap and gnupg; building for a foreign architecture also
+ needs qemu-user-static and binfmt-support.
