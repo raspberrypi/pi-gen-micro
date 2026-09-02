@@ -50,7 +50,13 @@ gpu_freq_min=200
 arm_freq=1500
 gpu_freq=500
 
-[02W]
+# Model filters are hierarchical: a board reads its own filter and the base
+# model's, so [pi4] already covers 4B, 400, CM4 and CM4S, and [pi5] covers
+# 5, 500 and CM5. Adding a [cm4s] or [cm5] section to repeat those settings
+# is redundant -- narrow the filter only to override a base setting. But the
+# filter name has to be one the firmware knows: [02W] is not, so the Zero 2 W
+# settings below never applied until this was [pi02].
+[pi02]
 arm_freq=800
 arm_freq_min=600
 
