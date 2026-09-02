@@ -55,7 +55,7 @@ gpu_freq_min=200
 arm_freq=1500
 gpu_freq=500
 
-[02W]
+[pi02]
 # Zero 2 W tops out at 1 GHz anyway; pin lower.
 arm_freq=800
 arm_freq_min=600
