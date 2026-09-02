@@ -10,30 +10,171 @@
 # never loaded; copying one is the same as copying nothing. raspi-firmware's
 # kernel hook shows the same split: it installs bcm27*.dtb into /boot/firmware
 # and a working 64-bit image carries no bcm2837-* device tree at all.
+
+# ---------------------------------------------------------------------------
+# Firmware selection
+# ---------------------------------------------------------------------------
 #
-# Firmware the BCM2835/6/7 boot ROM (Pi 0-3) loads. Named rather than globbed:
-# raspi-firmware carries four variants of each file and the camera and debug
-# ones need start_x=1 or start_debug=1, which no configuration here sets. The
-# cutdown variant is a different matter: the firmware selects it on a low
-# gpu_mem, and the fastboot and miller configurations both set gpu_mem=16. So
-# the plain firmware and the cutdown one both ship, and whichever the firmware
-# asks for is present.
-install_bcm283x_firmware() {
-  cp raspi-firmware/bootcode.bin "${OUT_DIR}"/
-  cp raspi-firmware/start.elf "${OUT_DIR}"/
-  cp raspi-firmware/start_cd.elf "${OUT_DIR}"/
-  cp raspi-firmware/fixup.dat "${OUT_DIR}"/
-  cp raspi-firmware/fixup_cd.dat "${OUT_DIR}"/
-  cp raspi-firmware/LICENCE.broadcom "${OUT_DIR}"/
+# raspi-firmware carries five variants of each start/fixup pair. The camera and
+# debug ones need start_x=1 or start_debug=1, which no configuration here sets,
+# and the recovery pair belongs to a different boot mode. That leaves plain and
+# cutdown -- and which of those a boot ROM asks for is a property of the
+# configuration's config.txt, not of the target:
+#
+#   fastboot, miller      gpu_mem=16, no override      every board: cutdown
+#   rpi-imager-embedded   gpu_mem_512=16, no gpu_mem    512MB: cutdown, else plain
+#   no low gpu_mem at all                              every board: plain
+#
+# Shipping a variant nothing can select is weight that gets signed, cached and
+# pushed to every device for nothing. Shipping one short of what the boot ROM
+# asks for is a board that never boots: f26afd5 assumed a fallback to the plain
+# firmware that the boot ROM does not have, and rpi-sb-provisioner 2.3.3 shipped
+# that (#352, #353). Neither is a judgement call, so read the answer out of the
+# config.txt going into the image and fail the build if the two disagree.
+#
+# gpu_mem is the *only* way to select the cutdown firmware. start_file and
+# fixup_file cannot name it -- the config.txt documentation is explicit that a
+# board told to load start*cd.elf that way fails to boot -- so this deliberately
+# writes nothing into config.txt and leaves the selection to gpu_mem, which is
+# already there. verify_firmware_selection() rejects such a pin if one is ever
+# added by hand.
+
+# SoCs whose firmware this image carries, set by install_soc_firmware.
+INSTALLED_FIRMWARE_SOCS=""
+
+# The start/fixup pair for a SoC, by variant.
+firmware_names() {
+  case "$1/$2" in
+    283x/plain)   echo "start.elf fixup.dat" ;;
+    283x/cutdown) echo "start_cd.elf fixup_cd.dat" ;;
+    2711/plain)   echo "start4.elf fixup4.dat" ;;
+    2711/cutdown) echo "start4cd.elf fixup4cd.dat" ;;
+    *) echo "Error: no firmware names for SoC '$1' variant '$2'" >&2 ; return 1 ;;
+  esac
 }
 
-# Firmware the BCM2711 boot ROM (Pi 4 family) loads, plain and cutdown as above.
-install_bcm2711_firmware() {
-  cp raspi-firmware/start4.elf "${OUT_DIR}"/
-  cp raspi-firmware/start4cd.elf "${OUT_DIR}"/
-  cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
-  cp raspi-firmware/fixup4cd.dat "${OUT_DIR}"/
+# Which variants this image's config.txt can make a boot ROM ask for.
+# Echoes: cutdown | plain | both
+firmware_variant() {
+  local cfg="${OUT_DIR}/config.txt" reachable value low=0 high=0
+
+  # Every gpu_mem a board could end up with. A gpu_mem before the first
+  # conditional filter applies to all of them, and 64 is the firmware's own
+  # default when there is none; a gpu_mem_256/512/1024 line replaces it on
+  # boards with that much RAM, and a gpu_mem behind a filter on the boards that
+  # filter names -- so each of those is reachable for some boards, not all.
+  reachable="$(awk '
+    /^[[:space:]]*\[/                            { filtered = 1 }
+    /^[[:space:]]*gpu_mem=[0-9]+/                 { sub(/^[^=]*=/, "")
+                                                    if (filtered) print $0 + 0
+                                                    else { base = $0 + 0; seen = 1 } }
+    /^[[:space:]]*gpu_mem_(256|512|1024)=[0-9]+/  { sub(/^[^=]*=/, ""); print $0 + 0 }
+    END                                           { print (seen ? base : 64) }
+  ' "${cfg}")"
+
+  for value in ${reachable}; do
+    if [ "${value}" -le 16 ]; then low=1; else high=1; fi
+  done
+
+  if   [ "${low}" = 1 ] && [ "${high}" = 1 ]; then echo both
+  elif [ "${low}" = 1 ];                      then echo cutdown
+  else                                             echo plain
+  fi
+}
+
+# Copies the start/fixup pair(s) a boot ROM for $1 can be asked for.
+install_soc_firmware() {
+  local soc="$1" variant name
+  local -a names=()
+  variant="$(firmware_variant)"
+
+  if [ "${variant}" = both ]; then
+    read -ra names <<< "$(firmware_names "${soc}" plain) $(firmware_names "${soc}" cutdown)"
+  else
+    read -ra names <<< "$(firmware_names "${soc}" "${variant}")"
+  fi
+  for name in "${names[@]}"; do
+    cp "raspi-firmware/${name}" "${OUT_DIR}"/
+  done
+
+  case " ${INSTALLED_FIRMWARE_SOCS} " in
+    *" ${soc} "*) ;;
+    *) INSTALLED_FIRMWARE_SOCS="${INSTALLED_FIRMWARE_SOCS}${soc} " ;;
+  esac
+}
+
+# Firmware the BCM2835/6/7 boot ROM (Pi 0-3) loads. bootcode.bin is the second
+# stage itself, so it ships whatever the gpu_mem arithmetic says.
+install_bcm283x_firmware() {
+  cp raspi-firmware/bootcode.bin "${OUT_DIR}"/
   cp raspi-firmware/LICENCE.broadcom "${OUT_DIR}"/
+  install_soc_firmware 283x
+}
+
+# Firmware the BCM2711 boot ROM (Pi 4 family) loads. There is deliberately no
+# BCM2712 helper: Pi 5 and CM5 take their firmware from EEPROM and ask for no
+# start file at all, which is why a pi5-family image is never given one to look
+# for.
+install_bcm2711_firmware() {
+  cp raspi-firmware/LICENCE.broadcom "${OUT_DIR}"/
+  install_soc_firmware 2711
+}
+
+# Fails the build if the image does not carry the firmware its own config.txt
+# will make a boot ROM ask for, or carries a start file nothing can select.
+# This is the check 2.3.3 went out without: the file list lives here, the
+# gpu_mem that selects from it lives in the configuration, and nothing compared
+# the two.
+verify_firmware_selection() {
+  local cfg="${OUT_DIR}/config.txt" variant soc name wanted="" rc=0
+
+  [ -n "${INSTALLED_FIRMWARE_SOCS}" ] || return 0
+  variant="$(firmware_variant)"
+
+  for soc in ${INSTALLED_FIRMWARE_SOCS}; do
+    if [ "${variant}" = both ]; then
+      wanted="${wanted} $(firmware_names "${soc}" plain) $(firmware_names "${soc}" cutdown)"
+    else
+      wanted="${wanted} $(firmware_names "${soc}" "${variant}")"
+    fi
+  done
+
+  # A start_file or fixup_file naming a cutdown variant is a documented
+  # non-boot: gpu_mem=16 is the only way to select that firmware. Catch it here
+  # rather than on a board that goes quiet.
+  while read -r name; do
+    [ -n "${name}" ] || continue
+    case "${name}" in
+      *cd.elf | *_cd.dat | *cd.dat)
+        echo "Error: config.txt pins ${name}; cutdown firmware cannot be selected by start_file/fixup_file and the board will not boot -- use gpu_mem=16" >&2
+        rc=1
+        ;;
+    esac
+    # Anything it does name outright has to be there, whichever variant the
+    # gpu_mem arithmetic landed on.
+    wanted="${wanted} ${name}"
+  done < <(sed -nE 's/^[[:space:]]*(start|fixup)_file=[[:space:]]*([^[:space:]#]+).*/\2/p' "${cfg}")
+
+  for name in ${wanted}; do
+    if [ ! -f "${OUT_DIR}/${name}" ]; then
+      echo "Error: config.txt asks for ${name}, which this image does not carry" >&2
+      rc=1
+    fi
+  done
+
+  for name in "${OUT_DIR}"/start*.elf "${OUT_DIR}"/fixup*.dat; do
+    [ -e "${name}" ] || continue
+    name="$(basename "${name}")"
+    case " ${wanted} " in
+      *" ${name} "*) ;;
+      *) echo "Error: ${name} ships but nothing in config.txt can select it" >&2 ; rc=1 ;;
+    esac
+  done
+
+  if [ "${rc}" -eq 0 ]; then
+    echo "Firmware selection: ${variant}, for ${INSTALLED_FIRMWARE_SOCS% }"
+  fi
+  return "${rc}"
 }
 
 # Device families, by the SoC whose firmware and DTBs they share. A provisioning
