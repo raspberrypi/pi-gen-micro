@@ -41,12 +41,12 @@ Output is written to `$PWD/out_image/`. It is recommended to run from a temporar
 
 An optional comma-separated list of target devices can be passed as the second argument to limit which device trees and firmware files are included. If omitted, files for all supported devices are included.
 
-Supported targets: `pi3`, `cm3`, `pi4`, `400`, `cm4`, `pi5`, `500`, `cm5`, `02W`
+Supported targets: `pi3`, `cm3`, `cm0`, `pi4`, `400`, `cm4`, `pi5`, `500`, `cm5`, `02W`
 
 Family shorthands expand to the devices sharing an SoC's firmware and device
 trees: `pi5-family` (`cm5`, `pi5`, `500`), `pi4-family` (`cm4`, `400`, `pi4`)
-and `pi3-family` (`pi3`, `cm3`, `02W`). Building one image per family keeps out
-firmware the target cannot load, roughly halving a fastboot image.
+and `pi3-family` (`pi3`, `cm3`, `02W`, `cm0`). Building one image per family keeps
+out firmware the target cannot load, roughly halving a fastboot image.
 
     pi-gen-micro-sysroot run fastboot cm5,pi5
 
