@@ -3,7 +3,7 @@
 _complete_pi_gen_micro() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local conf_root="${CONFIGURATION_ROOT:-/var/lib/pi-gen-micro/configurations/}"
-    local devices="pi3 cm3 pi4 400 cm4 pi5 500 cm5 02W"
+    local devices="pi3 cm3 cm0 pi4 400 cm4 pi5 500 cm5 02W"
 
     case "$COMP_CWORD" in
         1)

@@ -58,12 +58,12 @@ Arguments:
   configuration    Name of the configuration to build (required)
   target_devices   Comma-separated list of target devices (optional)
                    If omitted, builds for all supported devices.
-                   Supported: pi3, cm3, pi4, 400, cm4, pi5, 500, cm5, 02W
+                   Supported: pi3, cm3, cm0, pi4, 400, cm4, pi5, 500, cm5, 02W
                    Family shorthands, each expanding to the devices sharing
                    that SoC's firmware and device trees:
                      pi5-family  = cm5, pi5, 500
                      pi4-family  = cm4, 400, pi4
-                     pi3-family  = pi3, cm3, 02W
+                     pi3-family  = pi3, cm3, 02W, cm0
 
 Options:
   -h, --help             Show this help message
