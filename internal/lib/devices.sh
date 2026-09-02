@@ -12,19 +12,27 @@
 # and a working 64-bit image carries no bcm2837-* device tree at all.
 #
 # Firmware the BCM2835/6/7 boot ROM (Pi 0-3) loads. Named rather than globbed:
-# raspi-firmware's camera, debug and cutdown variants need start_x=1,
-# start_debug=1 or a low gpu_mem, none of which any configuration here sets.
+# raspi-firmware carries four variants of each file and the camera and debug
+# ones need start_x=1 or start_debug=1, which no configuration here sets. The
+# cutdown variant is a different matter: the firmware selects it on a low
+# gpu_mem, and the fastboot and miller configurations both set gpu_mem=16. So
+# the plain firmware and the cutdown one both ship, and whichever the firmware
+# asks for is present.
 install_bcm283x_firmware() {
   cp raspi-firmware/bootcode.bin "${OUT_DIR}"/
   cp raspi-firmware/start.elf "${OUT_DIR}"/
+  cp raspi-firmware/start_cd.elf "${OUT_DIR}"/
   cp raspi-firmware/fixup.dat "${OUT_DIR}"/
+  cp raspi-firmware/fixup_cd.dat "${OUT_DIR}"/
   cp raspi-firmware/LICENCE.broadcom "${OUT_DIR}"/
 }
 
-# Firmware the BCM2711 boot ROM (Pi 4 family) loads.
+# Firmware the BCM2711 boot ROM (Pi 4 family) loads, plain and cutdown as above.
 install_bcm2711_firmware() {
   cp raspi-firmware/start4.elf "${OUT_DIR}"/
+  cp raspi-firmware/start4cd.elf "${OUT_DIR}"/
   cp raspi-firmware/fixup4.dat "${OUT_DIR}"/
+  cp raspi-firmware/fixup4cd.dat "${OUT_DIR}"/
   cp raspi-firmware/LICENCE.broadcom "${OUT_DIR}"/
 }
 
