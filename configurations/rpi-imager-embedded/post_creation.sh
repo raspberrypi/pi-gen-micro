@@ -42,6 +42,30 @@ mkdir -p /var/run
 ifconfig lo 127.0.0.1 up
 udhcpc -i end0 -s /usr/share/udhcpc/default.script -b -q 2>/dev/null &
 
+# Set the clock before Imager starts. Nothing else here does -- there is no
+# timesyncd or ntpd -- so a board with no RTC battery boots at 1970 or where
+# its RTC stopped, and every HTTPS certificate is then "not yet valid". The
+# Date header of a plain-HTTP reply needs no TLS to read. Waiting for it also
+# holds Imager back until the lease is in, where it otherwise starts on a
+# slow PHY's link-down and never looks again. Give up after 10 s with no
+# carrier, so a board used offline is not kept waiting, and after 30 s in all.
+n=0
+while [ "$n" -lt 30 ]; do
+    if [ "$n" -ge 10 ] && [ "$(cat /sys/class/net/end0/carrier 2>/dev/null)" != 1 ]; then
+        break
+    fi
+    d=$(timeout 5 wget -q -S -O /dev/null http://downloads.raspberrypi.com/ 2>&1 \
+        | sed -n 's/^ *[Dd]ate: //p' | head -1)
+    # Guarded: date -s "" would set the clock to midnight, not fail.
+    if [ -n "$d" ] && date -s "$d" >/dev/null 2>&1; then
+        hwclock -w 2>/dev/null
+        echo "Clock set from downloads.raspberrypi.com: $(date -u)"
+        break
+    fi
+    sleep 1
+    n=$((n + 1))
+done
+
 # Wait briefly for a keyboard or mouse. Testing for /dev/input/event0 is not
 # enough: on Pi 5-class boards the gpio-keys power button (Bus=0019) claims
 # event0 and appears long before USB enumerates, so the check passed instantly
