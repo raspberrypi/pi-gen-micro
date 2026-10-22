@@ -7,3 +7,6 @@
 #
 dwc2
 ipv6
+# Exposes the bootloader config (the blconfig alias) as an nvmem device, so
+# Imager can read IMAGER_REPO_URL. A module, not built in, in the rpi-v8 kernel.
+nvmem-rmem
