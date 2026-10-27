@@ -18,31 +18,36 @@ else
     BASE_DEVICE="$(echo "$CRYPT_DEVICE" | sed 's/[0-9]*$//')"
 fi
 
-# Try rpifwcrypto first (key slot 1), fall back to OTP if it fails
-KEY=""
-if command -v cryptkey-rpifwcrypto >/dev/null 2>&1; then
-    # Try to get key from rpi-fw-crypto key slot 1
-    KEY="$(/usr/bin/cryptkey-rpifwcrypto "$BASE_DEVICE" 2>/dev/null)" || true
-fi
-
-if [ -z "$KEY" ] && command -v cryptkey-fetch >/dev/null 2>&1; then
-    # Fall back to OTP key (doesn't need device argument)
-    KEY="$(/usr/bin/cryptkey-fetch 2>/dev/null)" || true
-fi
-
-if [ -z "$KEY" ]; then
-    echo "ERROR: Failed to fetch cryptographic key from both rpifwcrypto and OTP" >&2
-    exit 1
-fi
-
 # Ensure device-mapper is available before cryptsetup touches
 # /dev/mapper/control. Opening the control node does not trigger the kernel's
 # auto-load, so dm_mod must be loaded explicitly; modprobe dm-crypt pulls it in
 # via the recorded dependency.
 modprobe dm-crypt
 
-# Unlock the LUKS container
-printf '%s' "$KEY" | /sbin/cryptsetup luksOpen "$CRYPT_DEVICE" cryptroot
+# Devices from releases that wrote an ed25519 seed to OTP were formatted with
+# the raw OTP key. rpifwcrypto HMACs that seed without complaint, so it yields
+# a key that cannot open them: fall back on a failed unlock, not just no key.
+try_unlock() {
+    [ -n "$1" ] && printf '%s' "$1" | /sbin/cryptsetup luksOpen "$CRYPT_DEVICE" cryptroot
+}
+
+UNLOCKED=""
+if command -v cryptkey-rpifwcrypto >/dev/null 2>&1; then
+    KEY="$(/usr/bin/cryptkey-rpifwcrypto "$BASE_DEVICE" 2>/dev/null)" || KEY=""
+    try_unlock "$KEY" && UNLOCKED=1
+fi
+
+if [ -z "$UNLOCKED" ] && command -v cryptkey-fetch >/dev/null 2>&1; then
+    # cryptkey-fetch prints a key even when the OTP is blank, so honour its status
+    KEY="$(/usr/bin/cryptkey-fetch 2>/dev/null)" || KEY=""
+    try_unlock "$KEY" && UNLOCKED=1
+fi
+unset KEY
+
+if [ -z "$UNLOCKED" ]; then
+    echo "ERROR: Failed to unlock $CRYPT_DEVICE with keys from rpifwcrypto or OTP" >&2
+    exit 1
+fi
 
 # Mount the decrypted root at the conventional initrd mountpoint. systemd's
 # initrd-switch-root.service will pivot here once initrd-root-fs.target is
