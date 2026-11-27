@@ -193,43 +193,38 @@ expand_device_families() {
   printf '%s\n' "${out[@]}"
 }
 
+# Every device tree the kernel ships for one SoC. A list by board missed the
+# trees each new kernel added, so a board could boot a family image with none.
+# A firmware reads only its own board's tree, so the rest cost a few KB each.
+install_soc_dtbs() {
+  local kimg="${KPKG_EXTRACT}/usr/lib/linux-image-${KERNEL_VERSION_STR}"
+  local pattern
+  case "$1" in
+    2711) pattern="bcm2711-*.dtb" ;;
+    # bcm2712d0-* is a stepping, not a separate SoC.
+    2712) pattern="bcm2712*.dtb" ;;
+    *) echo "Error: no device tree pattern for SoC '$1'" >&2 ; return 1 ;;
+  esac
+  set -- "$kimg"/broadcom/$pattern
+  if [ ! -e "$1" ]; then
+    echo "Error: no ${pattern} in ${kimg}/broadcom" >&2
+    return 1
+  fi
+  cp "$@" "${OUT_DIR}"/
+}
+
 install_device_files() {
   local target="$1"
   local kimg="${KPKG_EXTRACT}/usr/lib/linux-image-${KERNEL_VERSION_STR}"
 
   case "$target" in
-    cm5)
-      cp "$kimg"/broadcom/bcm2712-rpi-cm5-cm4io.dtb "${OUT_DIR}"/
-      cp "$kimg"/broadcom/bcm2712-rpi-cm5-cm5io.dtb "${OUT_DIR}"/
-      cp "$kimg"/broadcom/bcm2712-rpi-cm5l-cm4io.dtb "${OUT_DIR}"/
-      cp "$kimg"/broadcom/bcm2712-rpi-cm5l-cm5io.dtb "${OUT_DIR}"/
+    cm5|500|pi5)
+      install_soc_dtbs 2712
       install_pi5_overlays
       ;;
-    500)
-      cp "$kimg"/broadcom/bcm2712-rpi-500.dtb "${OUT_DIR}"/
-      install_pi5_overlays
-      ;;
-    pi5)
-      cp "$kimg"/broadcom/bcm2712d0-rpi-5-b.dtb "${OUT_DIR}"/
-      cp "$kimg"/broadcom/bcm2712-d-rpi-5-b.dtb "${OUT_DIR}"/
-      cp "$kimg"/broadcom/bcm2712-rpi-5-b.dtb "${OUT_DIR}"/
-      install_pi5_overlays
-      ;;
-    cm4)
+    cm4|400|pi4)
       install_bcm2711_firmware
-      cp "$kimg"/broadcom/bcm2711-rpi-cm4.dtb "${OUT_DIR}"/
-      cp "$kimg"/broadcom/bcm2711-rpi-cm4s.dtb "${OUT_DIR}"/
-      cp "$kimg"/broadcom/bcm2711-rpi-cm4-io.dtb "${OUT_DIR}"/
-      install_pi4_overlays
-      ;;
-    400)
-      install_bcm2711_firmware
-      cp "$kimg"/broadcom/bcm2711-rpi-400.dtb "${OUT_DIR}"/
-      install_pi4_overlays
-      ;;
-    pi4)
-      install_bcm2711_firmware
-      cp "$kimg"/broadcom/bcm2711-rpi-4-b.dtb "${OUT_DIR}"/
+      install_soc_dtbs 2711
       install_pi4_overlays
       ;;
     pi3)
